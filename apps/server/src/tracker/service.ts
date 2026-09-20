@@ -574,9 +574,9 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
     const own = players.find((player) => player.linkedProfileIds.includes(actorProfileId))?.tag ?? players[0]?.tag ?? "";
     const requested = normalizeTrackerTag(raw.playerTag);
     const playerTag = allowed.has(requested) ? requested : own;
-    const opponent = normalizeTrackerTag(raw.opponentTag);
-    const opponentTag = opponent && opponent !== playerTag ? opponent : null;
     const relationship: TrackerRelationship = raw.relationship === "versus" || raw.relationship === "alongside" ? raw.relationship : "all";
+    const opponent = normalizeTrackerTag(raw.opponentTag);
+    const opponentTag = relationship !== "all" && opponent && opponent !== playerTag ? opponent : null;
     const date = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
     return { playerTag, opponentTag, relationship, mode: text(raw.mode) || null, dateFrom: date(raw.dateFrom), dateTo: date(raw.dateTo) };
   };

@@ -200,11 +200,19 @@ describe("filters and analytics", () => {
     await service.syncNow([initialPlayers[0]!.tag]);
     const result = summary(service, "a", ["a", "b", "c", "d"], { playerTag: initialPlayers[0]!.tag, opponentTag: initialPlayers[2]!.tag, relationship: "alongside", dateFrom: "2026-09-08", dateTo: "2026-09-08", mode: "72000006:TeamVsTeam" });
     expect(result.sample).toMatchObject({ games: 1, wins: 1 });
+    expect(result.coverage?.sourceCounts).toEqual({ api: 2, manual: 0 });
     expect(result.recentGames).toHaveLength(1);
     expect(result.opponentCards[0]).toMatchObject({ games: 1, losses: 0 });
     expect(result.decks).toHaveLength(1);
     expect(result.opponentDecks).toHaveLength(2);
     expect(result.deckMatchups).toHaveLength(2);
+
+    const allWithStaleOpponent = summary(service, "a", ["a", "b", "c", "d"], { playerTag: initialPlayers[0]!.tag, opponentTag: initialPlayers[2]!.tag, relationship: "all" });
+    const allWithoutOpponent = summary(service, "a", ["a", "b", "c", "d"], { playerTag: initialPlayers[0]!.tag, relationship: "all" });
+    expect(allWithStaleOpponent.filters.opponentTag).toBeNull();
+    expect(allWithStaleOpponent.sample).toEqual(allWithoutOpponent.sample);
+    expect(allWithStaleOpponent.recentGames.map((item) => item.id)).toEqual(allWithoutOpponent.recentGames.map((item) => item.id));
+    expect(allWithStaleOpponent.sample.games).toBe(2);
   });
 
   it("does not expose or allow undo of another same-tag account's private manual result", () => {
