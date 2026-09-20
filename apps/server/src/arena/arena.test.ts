@@ -86,6 +86,7 @@ const createPairWithSettings = (
 };
 
 const credentialFor = (pair: ReturnType<typeof createPair>, seat: "a" | "b") => seat === "a" ? pair.host.credential : pair.guest.credential;
+const other = (seat: "a" | "b") => seat === "a" ? "b" as const : "a" as const;
 
 const firstLegal = (view: ArenaView) => {
   const cell = view.board.find((candidate) => candidate.legalForms.length > 0);
@@ -210,14 +211,104 @@ describe("authoritative arena service", () => {
     expect(oneLoaded.participants.map((participant) => participant.loaded)).toEqual([true, false]);
     const drafting = arena.setLoaded(host.room.id, guest.credential.token, { commandId: "guest-loaded" });
     expect(drafting.phase).toBe("drafting");
-    expect(drafting.activeSeat).toBe("a");
+    expect(drafting.activeSeat).toBe(drafting.megaStarter);
     expect(drafting.interactiveAt).not.toBeNull();
     expect(drafting.deadlineAt).not.toBeNull();
   });
 
+  it("maps the canonical 16-pick Mega snake onto the persisted random starter and alternates a rematch", () => {
+    const arena = service();
+    const pair = createPair(arena);
+    const firstStarter = pair.started.megaStarter;
+    expect(firstStarter).toMatch(/^[ab]$/);
+    if (firstStarter !== "a" && firstStarter !== "b") throw new Error("Mega starter was not assigned");
+    expect(pair.started.activeSeat).toBe(firstStarter);
+
+    const completed = completePair(arena, pair, "starter-snake");
+    expect(completed.phase).toBe("complete");
+    expect(completed.events.map((event) => event.seat)).toEqual([
+      firstStarter, other(firstStarter), other(firstStarter), firstStarter,
+      firstStarter, other(firstStarter), other(firstStarter), firstStarter,
+      firstStarter, other(firstStarter), other(firstStarter), firstStarter,
+      firstStarter, other(firstStarter), other(firstStarter), firstStarter,
+    ]);
+    expect(completed.participants.map((participant) => participant.deckCount)).toEqual([8, 8]);
+
+    const waiting = arena.rematch(completed.id, pair.host.credential.token, { commandId: "starter-rematch" });
+    expect(waiting.megaStarter).toBe(other(firstStarter));
+    expect(arena.rematch(completed.id, pair.host.credential.token, { commandId: "starter-rematch" }).megaStarter).toBe(other(firstStarter));
+    arena.setReady(completed.id, pair.host.credential.token, { ready: true, commandId: "starter-rematch-host-ready" });
+    arena.setReady(completed.id, pair.guest.credential.token, { ready: true, commandId: "starter-rematch-guest-ready" });
+    arena.setLoaded(completed.id, pair.host.credential.token, { commandId: "starter-rematch-host-loaded" });
+    const restarted = arena.setLoaded(completed.id, pair.guest.credential.token, { commandId: "starter-rematch-guest-loaded" });
+    expect(restarted).toMatchObject({ phase: "drafting", megaStarter: other(firstStarter), activeSeat: other(firstStarter) });
+  });
+
+  it("only advances an authenticated pair cursor after a Mega round starts", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "arena-starter-pair-"));
+    tempRoots.push(tempRoot);
+    const arena = service({ databasePath: path.join(tempRoot, "arena.sqlite") });
+    const pairKey = createHash("sha256").update("stable social pair").digest("hex");
+    const createInvited = (operationId: string) => {
+      const hostToken = `${operationId}-host-token`;
+      const guestToken = `${operationId}-guest-token`;
+      const room = arena.createInvitedRoom({
+        operationId,
+        pairKey,
+        settings: arena.normalizeSettings({ mode: "mega", pickSeconds: 120 }),
+        host: { name: "Host", collection: arena.normalizeCollection(null), tokenHash: createHash("sha256").update(hostToken).digest("hex") },
+        guest: { name: "Guest", collection: arena.normalizeCollection(null), tokenHash: createHash("sha256").update(guestToken).digest("hex") },
+      });
+      return { room, hostToken, guestToken };
+    };
+    const start = (created: ReturnType<typeof createInvited>, suffix: string) => {
+      arena.setReady(created.room.roomId, created.hostToken, { ready: true, commandId: `${suffix}-host-ready` });
+      arena.setReady(created.room.roomId, created.guestToken, { ready: true, commandId: `${suffix}-guest-ready` });
+      arena.setLoaded(created.room.roomId, created.hostToken, { commandId: `${suffix}-host-loaded` });
+      return arena.setLoaded(created.room.roomId, created.guestToken, { commandId: `${suffix}-guest-loaded` });
+    };
+
+    const unstarted = createInvited("pair-unstarted");
+    const first = start(createInvited("pair-first"), "pair-first");
+    const delayed = start(unstarted, "pair-delayed");
+    expect(delayed.megaStarter).toBe(other(first.megaStarter as "a" | "b"));
+  });
+
+  it("preserves an active legacy Mega room's seat-A order after restart", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "arena-legacy-mega-starter-"));
+    tempRoots.push(tempRoot);
+    const databasePath = path.join(tempRoot, "arena.sqlite");
+    let entropy = 1;
+    const randomBytes = (size: number) => {
+      const bytes = new Uint8Array(size);
+      bytes[0] = size === 1 ? 0 : entropy++;
+      return bytes;
+    };
+    let arena = service({ databasePath, randomBytes });
+    const pair = createPair(arena);
+    expect(pair.started).toMatchObject({ megaStarter: "a", activeSeat: "a" });
+    const hostStart = arena.getView(pair.started.id, pair.host.credential.token);
+    const afterFirst = arena.pick(pair.started.id, pair.host.credential.token, {
+      ...firstLegal(hostStart), commandId: "legacy-mega-first", expectedRevision: hostStart.revision,
+    });
+    expect(afterFirst.activeSeat).toBe("b");
+    arena.close();
+    services.splice(services.indexOf(arena), 1);
+
+    const inspection = new DatabaseSync(databasePath);
+    const row = inspection.prepare("SELECT state_json FROM arena_rooms WHERE id = ?").get(pair.host.room.id) as { state_json: string };
+    const state = JSON.parse(row.state_json) as Record<string, unknown>;
+    delete state.megaStarter;
+    inspection.prepare("UPDATE arena_rooms SET state_json = ? WHERE id = ?").run(JSON.stringify(state), pair.host.room.id);
+    inspection.close();
+
+    arena = service({ databasePath, randomBytes });
+    expect(arena.getView(pair.host.room.id, pair.host.credential.token)).toMatchObject({ phase: "drafting", megaStarter: "a", activeSeat: "b", pickNumber: 2 });
+  });
+
   it("keeps the first pick inactive until the initial deal finishes", () => {
     let timestamp = 1_000;
-    const arena = service({ now: () => timestamp, initialDealMs: undefined });
+    const arena = service({ now: () => timestamp, initialDealMs: undefined, randomBytes: (size) => new Uint8Array(size) });
     const host = arena.createRoom({ name: "Host", practice: true });
     arena.setReady(host.room.id, host.credential.token, { ready: true, commandId: "deal-ready" });
     const drafting = arena.setLoaded(host.room.id, host.credential.token, { commandId: "deal-loaded" });
@@ -1325,7 +1416,12 @@ describe("authoritative arena service", () => {
     arena.setLoaded(host.room.id, host.credential.token, { commandId: "host-loaded" });
     const view = arena.setLoaded(host.room.id, guest.credential.token, { commandId: "guest-loaded" });
     expect(view.participants.find((participant) => participant.seat === "a")?.collectionSource).toBe("manual");
-    const hostView = arena.getView(host.room.id, host.credential.token);
+    let hostView = arena.getView(host.room.id, host.credential.token);
+    if (hostView.activeSeat !== "a") {
+      const guestView = arena.getView(host.room.id, guest.credential.token);
+      arena.pick(guestView.id, guest.credential.token, { ...firstLegal(guestView), commandId: "unowned-evo-guest-first", expectedRevision: guestView.revision });
+      hostView = arena.getView(host.room.id, host.credential.token);
+    }
     expect(hostView.board.every((cell) => cell.legalForms.every((form) => form === "base"))).toBe(true);
     const evolved = hostView.board.find((cell) => catalog.find((card) => card.key === cell.cardKey)?.forms.some((form) => form.key === "evolution"));
     expect(evolved).toBeDefined();
@@ -1521,34 +1617,38 @@ describe("authoritative arena service", () => {
       includeCards: [...champions, ...bases],
     };
     const pair = createPairWithSettings(arena, settings);
-    let hostView = arena.getView(pair.host.room.id, pair.host.credential.token);
-    const firstChampion = hostView.board.find((cell) => cell.cardKey === champions[0]);
+    const initial = arena.getView(pair.host.room.id, pair.host.credential.token);
+    const targetSeat = initial.activeSeat as "a" | "b";
+    const targetCredential = credentialFor(pair, targetSeat);
+    const opponentCredential = credentialFor(pair, other(targetSeat));
+    let targetView = arena.getView(pair.host.room.id, targetCredential.token);
+    const firstChampion = targetView.board.find((cell) => cell.cardKey === champions[0]);
     expect(firstChampion?.legalForms).toEqual(["champion"]);
-    arena.pick(hostView.id, pair.host.credential.token, {
+    arena.pick(targetView.id, targetCredential.token, {
       cardKey: champions[0] as string,
       form: "champion",
       commandId: "first-champion",
-      expectedRevision: hostView.revision,
+      expectedRevision: targetView.revision,
     });
     let guestPick = 0;
-    while ((hostView = arena.getView(pair.host.room.id, pair.host.credential.token)).activeSeat !== "a") {
-      const guestView = arena.getView(pair.host.room.id, pair.guest.credential.token);
-      const base = guestView.board.find((cell) => !champions.includes(cell.cardKey) && cell.legalForms.includes("base"));
+    while ((targetView = arena.getView(pair.host.room.id, targetCredential.token)).activeSeat !== targetSeat) {
+      const opponentView = arena.getView(pair.host.room.id, opponentCredential.token);
+      const base = opponentView.board.find((cell) => !champions.includes(cell.cardKey) && cell.legalForms.includes("base"));
       expect(base).toBeDefined();
-      arena.pick(guestView.id, pair.guest.credential.token, {
+      arena.pick(opponentView.id, opponentCredential.token, {
         cardKey: base!.cardKey,
         form: "base",
         commandId: `avoid-second-champion-${guestPick++}`,
-        expectedRevision: guestView.revision,
+        expectedRevision: opponentView.revision,
       });
     }
-    const secondChampion = hostView.board.find((cell) => cell.cardKey === champions[1]);
+    const secondChampion = targetView.board.find((cell) => cell.cardKey === champions[1]);
     expect(secondChampion?.legalForms).toEqual([]);
-    expect(() => arena.pick(hostView.id, pair.host.credential.token, {
+    expect(() => arena.pick(targetView.id, targetCredential.token, {
       cardKey: champions[1] as string,
       form: "champion",
       commandId: "blocked-second-champion",
-      expectedRevision: hostView.revision,
+      expectedRevision: targetView.revision,
     })).toThrowError(/legal completion/i);
 
     const rejected = service({ catalog: realCatalogPayload.cards, catalogVersion: realCatalogPayload.version });
@@ -1633,7 +1733,7 @@ describe("authoritative arena service", () => {
     let timestamp = 1_000;
     const champions = realCatalogPayload.cards.filter((card) => card.forms.length === 1 && card.forms[0]?.key === "champion").slice(0, 2).map((card) => card.key);
     const bases = realCatalogPayload.cards.filter((card) => card.forms.some((form) => form.key === "base")).slice(0, 14).map((card) => card.key);
-    const arena = service({ catalog: realCatalogPayload.cards, catalogVersion: realCatalogPayload.version, now: () => timestamp });
+    const arena = service({ catalog: realCatalogPayload.cards, catalogVersion: realCatalogPayload.version, now: () => timestamp, randomBytes: (size) => new Uint8Array(size) });
     const host = arena.createRoom({
       name: "Host",
       practice: true,
@@ -1781,7 +1881,13 @@ describe("authoritative arena service", () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "arena-test-"));
     tempRoots.push(tempRoot);
     const databasePath = path.join(tempRoot, "arena.sqlite");
-    let arena = service({ databasePath, botDelayMs: 10 });
+    let entropy = 1;
+    const randomBytes = (size: number) => {
+      const bytes = new Uint8Array(size);
+      bytes[0] = size === 1 ? 0 : entropy++;
+      return bytes;
+    };
+    let arena = service({ databasePath, botDelayMs: 10, randomBytes });
     const created = arena.createRoom({ name: "Host", practice: true, settings: { mode: "mega", poolSize: 36, pickSeconds: 2, specialForms: true, battleMode: "Friendly" } });
     arena.setReady(created.room.id, created.credential.token, { ready: true, commandId: "ready" });
     let view = arena.setLoaded(created.room.id, created.credential.token, { commandId: "loaded" });
@@ -1791,7 +1897,7 @@ describe("authoritative arena service", () => {
     arena.close();
     services.splice(services.indexOf(arena), 1);
 
-    arena = service({ databasePath, botDelayMs: 10 });
+    arena = service({ databasePath, botDelayMs: 10, randomBytes });
     await new Promise((resolve) => setTimeout(resolve, 50));
     const resumed = arena.getView(created.room.id, created.credential.token);
     expect(resumed.events.length).toBeGreaterThanOrEqual(2);
@@ -1861,14 +1967,14 @@ describe("authoritative arena service", () => {
     arena.setReady(host.room.id, host.credential.token, { ready: true, commandId: "host-ready" });
     arena.setReady(host.room.id, guest.credential.token, { ready: true, commandId: "guest-ready" });
     arena.setLoaded(host.room.id, host.credential.token, { commandId: "host-loaded" });
-    arena.setLoaded(host.room.id, guest.credential.token, { commandId: "guest-loaded" });
+    const started = arena.setLoaded(host.room.id, guest.credential.token, { commandId: "guest-loaded" });
     arena.close();
     services.splice(services.indexOf(arena), 1);
     timestamp = 3_000;
     arena = service({ databasePath, now: () => timestamp });
     await new Promise((resolve) => setTimeout(resolve, 10));
     const resumed = arena.getView(host.room.id, host.credential.token);
-    expect(resumed.events[0]).toMatchObject({ seat: "a", automatic: true, at: 3_000 });
+    expect(resumed.events[0]).toMatchObject({ seat: started.megaStarter, automatic: true, at: 3_000 });
   });
 
   it("resumes and completes an elapsed persisted whole-draft deadline", async () => {

@@ -138,6 +138,9 @@ export function DraftStage({ room, cards, pending, onPick, onLeave, soundEnabled
   const cardsByKey = useMemo(() => new Map(cards.map((card) => [card.key, card])), [cards]);
   const viewer = room.participants.find((participant) => participant.seat === room.viewer) ?? room.participants[0];
   const opponent = room.participants.find((participant) => participant.seat !== room.viewer) ?? room.participants[1];
+  const megaStarter = room.megaStarter === null || room.megaStarter === undefined
+    ? null
+    : room.participants.find((participant) => participant.seat === room.megaStarter);
   const [chooser, setChooser] = useState<ChosenCell | null>(null);
   const [localPending, setLocalPending] = useState(false);
   const [dealStartedAt, setDealStartedAt] = useState<number | null>(() => canAnimateInitialDeal(room) ? room.startedAt : null);
@@ -348,13 +351,16 @@ export function DraftStage({ room, cards, pending, onPick, onLeave, soundEnabled
       { label: "Hero", start: 3, end: 3, kind: "hero" },
       { label: `Regular ×${regularRoundCount}`, start: 4, end: 3 + regularRoundCount, kind: "base" },
     ].map((step) => <span key={step.start} className={`is-${step.kind} ${currentRoundNumber > step.end ? "is-complete" : ""} ${currentRoundNumber >= step.start && currentRoundNumber <= step.end ? "is-current" : ""}`} aria-current={currentRoundNumber >= step.start && currentRoundNumber <= step.end ? "step" : undefined}>{currentRoundNumber > step.end ? "✓ " : ""}{step.label}</span>)}
-  </div> : <div
+  </div> : <>
+    {room.settings.mode === "mega" && !mirror && megaStarter ? <div className="arena-starter-note" aria-live="polite">{megaStarter.name} opens this Mega Draft</div> : null}
+    <div
     className={`arena-turn-banner ${localTurn ? "is-local" : "is-opponent"} ${privateMode && room.settings.mode === "triple" ? "is-triple-placeholder" : ""}`}
     aria-live={privateMode && room.settings.mode === "triple" ? "off" : "polite"}
     aria-hidden={privateMode && room.settings.mode === "triple"}
   >
     {privateMode && room.settings.mode === "triple" ? null : turnLabel}
-  </div>;
+    </div>
+  </>;
 
   const renderCell = (cell: ArenaCell | null, index: number, opponentChoice = false) => {
     if (!cell) return <span className="arena-cell is-empty" key={`empty-${index}`} aria-hidden="true" />;

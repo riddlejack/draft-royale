@@ -34,6 +34,7 @@ import {
 const seats = ["a", "b"] as const;
 const forms = ["base", "evolution", "hero", "champion"] as const;
 const deckSize = 8;
+/** Canonical Mega sequence. `megaPickOrderFor` maps A/B onto the stored starter. */
 const megaPickOrder: ArenaSeat[] = ["a", "b", "b", "a", "a", "b", "b", "a", "a", "b", "b", "a", "a", "b", "b", "a"];
 const mirrorPickOrder: ArenaSeat[] = ["a", "b", "a", "b", "a", "b", "a", "b"];
 const groupedTripleSchedule: ArenaRoundKind[] = ["evolution", "evolution", "hero_champion", "base", "base", "base", "base", "base"];
@@ -70,6 +71,10 @@ interface InternalRoom {
   offerQueues: Record<ArenaSeat, string[][]>;
   sharedOfferQueue: string[][];
   offerRevision: Record<ArenaSeat, number>;
+  /** First picker for this Mega round. It is never inferred from host status. */
+  megaStarter: ArenaSeat | null;
+  /** Opaque stable social-pair hash; absent for anonymous invite-code rooms. */
+  megaPairKey?: string;
   activeSeat: ArenaSeat | null;
   pickNumber: number;
   totalPicks: number;
@@ -102,6 +107,10 @@ interface CommandRow {
 interface InvitedOperationRow {
   payload_hash: string;
   room_id: string;
+}
+
+interface MegaPairRow {
+  next_starter: ArenaSeat;
 }
 
 export interface ArenaServiceOptions {
@@ -144,6 +153,8 @@ export interface CreateInvitedRoomInput {
   settings: ArenaSettings;
   host: InvitedRoomParticipantInput;
   guest: InvitedRoomParticipantInput;
+  /** Optional opaque, stable social-pair key. Never use a display name or player tag. */
+  pairKey?: string;
 }
 
 export interface CreateInvitedRoomResult {
@@ -225,6 +236,12 @@ const decodeRoom = (json: string): InternalRoom => {
     if (room.settings.mirrorMode === undefined) room.settings.mirrorMode = false;
     if (room.sharedOfferQueue === undefined) room.sharedOfferQueue = [];
     if (room.wholeDraftDeadlineAt === undefined) room.wholeDraftDeadlineAt = null;
+    // Before starter persistence, all active Mega rooms used seat A. Preserve
+    // their existing sequence; waiting/loading rooms have not consumed a start.
+    if (room.megaStarter !== "a" && room.megaStarter !== "b") {
+      room.megaStarter = room.settings.mode === "mega" && !room.settings.mirrorMode
+        && (room.phase === "drafting" || room.phase === "complete") ? "a" : null;
+    }
     return room;
   } catch {
     throw new ArenaError(500, "Stored room state is invalid", "INVALID_ROOM_STATE");
@@ -842,6 +859,9 @@ const pickOrderFor = (mode: ArenaMode): ArenaSeat[] => {
   return [];
 };
 
+const megaPickOrderFor = (starter: ArenaSeat): ArenaSeat[] =>
+  megaPickOrder.map((canonicalSeat) => canonicalSeat === "a" ? starter : otherSeat(starter));
+
 const availableAfterMegaPick = (room: InternalRoom, cardKey: string) =>
   room.boardKeys.filter((key) => key !== cardKey && !room.selected[key]);
 
@@ -986,7 +1006,7 @@ const deadlineFor = (room: InternalRoom, interactiveAt: number) =>
 
 const advanceSeat = (room: InternalRoom, seat: ArenaSeat, now: number, presentationDelayMs: number) => {
   if (room.settings.mode === "mega") {
-    const order = pickOrderFor("mega");
+    const order = megaPickOrderFor(room.megaStarter ?? "a");
     if (room.events.length >= order.length) {
       room.phase = "complete";
       room.activeSeat = null;
@@ -1079,7 +1099,8 @@ const advanceMirror = (room: InternalRoom, now: number, presentationDelayMs: num
 };
 
 const advanceMega = (room: InternalRoom, now: number, presentationDelayMs: number) => {
-  if (room.events.length >= megaPickOrder.length) {
+  const order = megaPickOrderFor(room.megaStarter ?? "a");
+  if (room.events.length >= order.length) {
     room.phase = "complete";
     room.activeSeat = null;
     room.pickNumber = room.totalPicks;
@@ -1088,7 +1109,7 @@ const advanceMega = (room: InternalRoom, now: number, presentationDelayMs: numbe
     room.wholeDraftDeadlineAt = null;
     return;
   }
-  room.activeSeat = megaPickOrder[room.events.length] as ArenaSeat;
+  room.activeSeat = order[room.events.length] as ArenaSeat;
   room.pickNumber = room.events.length + 1;
   room.interactiveAt = now + presentationDelayMs;
   room.deadlineAt = deadlineFor(room, room.interactiveAt);
@@ -1340,6 +1361,11 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
       created_at INTEGER NOT NULL,
       FOREIGN KEY (room_id) REFERENCES arena_rooms(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS arena_mega_starter_pairs (
+      pair_key TEXT PRIMARY KEY,
+      next_starter TEXT NOT NULL CHECK (next_starter IN ('a','b')),
+      updated_at INTEGER NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS arena_rooms_expiry ON arena_rooms(expires_at);
   `);
 
@@ -1366,6 +1392,27 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
       room.expiresAt,
       room.id,
     );
+  };
+
+  /**
+   * Commit a Mega starter exactly when a round becomes interactive. A failed
+   * load, a retry, or a duplicate command never reaches this function's commit.
+   * A pair cursor is deliberately opaque and only supplied by authenticated
+   * social identity; anonymous names/tags are not an identity signal.
+   */
+  const commitMegaStarter = (room: InternalRoom) => {
+    if (room.settings.mode !== "mega" || isMirrorRoom(room)) return;
+    if (room.megaStarter === null) {
+      const pair = room.megaPairKey
+        ? db.prepare("SELECT next_starter FROM arena_mega_starter_pairs WHERE pair_key = ?").get(room.megaPairKey) as unknown as MegaPairRow | undefined
+        : undefined;
+      room.megaStarter = pair?.next_starter ?? ((random(1)[0] ?? 0) % 2 === 0 ? "a" : "b");
+    }
+    if (room.megaPairKey) {
+      db.prepare(`INSERT INTO arena_mega_starter_pairs(pair_key, next_starter, updated_at) VALUES(?,?,?)
+        ON CONFLICT(pair_key) DO UPDATE SET next_starter=excluded.next_starter, updated_at=excluded.updated_at`)
+        .run(room.megaPairKey, otherSeat(room.megaStarter), now());
+    }
   };
 
   const credentialSeat = (roomId: string, token: string): ArenaSeat => {
@@ -1472,6 +1519,7 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
       deadlineAt: privateMode ? room.deadlineAtBySeat[viewer] : room.deadlineAt,
       serverNow: now(),
       events: clone(privateMode ? room.events.filter((event) => event.seat === viewer) : room.events),
+      ...(room.settings.mode === "mega" && !isMirrorRoom(room) ? { megaStarter: room.megaStarter } : {}),
     };
     if (room.settings.mode === "triple" && room.settings.groupedSpecialRounds) {
       const roundSchedule = isMirrorRoom(room) ? mirrorRoundSchedule(room) : groupedTripleSchedule;
@@ -1934,7 +1982,9 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
       throw new ArenaError(400, "Invited room token hashes must be 64 lowercase hexadecimal characters", "INVALID_TOKEN_HASH");
     }
     if (host.tokenHash === guest.tokenHash) throw new ArenaError(400, "Invited room seats require distinct token hashes", "INVALID_TOKEN_HASH");
-    const normalizedPayload = { settings, host, guest };
+    const pairKey = input.pairKey === undefined ? undefined : requireString(input.pairKey, "pairKey", 64);
+    if (pairKey !== undefined && !/^[a-f0-9]{64}$/.test(pairKey)) throw new ArenaError(400, "pairKey must be a 64-character lowercase hexadecimal hash", "INVALID_PAIR_KEY");
+    const normalizedPayload = { settings, host, guest, ...(pairKey ? { pairKey } : {}) };
     const hash = payloadHash(normalizedPayload);
     db.exec("BEGIN IMMEDIATE");
     try {
@@ -1973,6 +2023,8 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
         offerQueues: { a: [], b: [] },
         sharedOfferQueue: [],
         offerRevision: { a: 0, b: 0 },
+        megaStarter: null,
+        ...(pairKey ? { megaPairKey: pairKey } : {}),
         activeSeat: null,
         pickNumber: 0,
         totalPicks: totalPicksFor(settings),
@@ -2042,6 +2094,7 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
       offerQueues: { a: [], b: [] },
       sharedOfferQueue: [],
       offerRevision: { a: 0, b: 0 },
+      megaStarter: null,
       activeSeat: null,
       pickNumber: 0,
       totalPicks: totalPicksFor(settings),
@@ -2134,6 +2187,7 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
       if (!participant || participant.bot) throw new ArenaError(403, "This seat cannot acknowledge loading", "FORBIDDEN");
       participant.loaded = true;
       if (room.participants.a?.loaded && room.participants.b?.loaded) {
+        commitMegaStarter(room);
         activatePreparedDraft(room, now(), initialDealMsFor(room.settings.mode));
       }
     });
@@ -2193,6 +2247,11 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
       if (room.phase !== "complete") throw new ArenaError(409, "Rematch is available after the draft completes", "INVALID_PHASE");
       room.settings = sanitizeSettings(room.settings, DEFAULT_ARENA_SETTINGS, room.catalogCards);
       room.round += 1;
+      // The completed starter, not host status, determines the rematch opener.
+      // It is committed to a pair cursor only after both seats load again.
+      room.megaStarter = room.settings.mode === "mega" && !isMirrorRoom(room)
+        ? otherSeat(room.megaStarter ?? "a")
+        : null;
       room.phase = "waiting";
       room.decks = { a: [], b: [] };
       room.boardKeys = [];

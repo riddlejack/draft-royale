@@ -355,6 +355,15 @@
   transform: rotate(-.4deg);
 }
 
+.arena-starter-note {
+  min-height: 18px;
+  color: #d8e9ff;
+  font-size: clamp(11px, 2.1dvh, 16px);
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-align: center;
+}
+
 .arena-turn-banner.is-opponent { color: #ff695f; }
 
 .arena-turn-banner.is-triple-placeholder {

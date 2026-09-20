@@ -143,6 +143,8 @@ export interface ArenaView {
   deadlineAt: number | null;
   serverNow: number;
   events: ArenaPickEvent[];
+  /** Mega only: the player who opens this round; null until loading completes. */
+  megaStarter?: ArenaSeat | null;
   roundSchedule?: ArenaRoundKind[];
   currentRound?: ArenaRoundMetadata;
   /** Null when the deck contains a card whose deployment cost is variable. */
