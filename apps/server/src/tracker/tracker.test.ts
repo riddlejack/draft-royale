@@ -340,6 +340,84 @@ describe("deck log", () => {
   });
 });
 
+describe("insights, card stats and deck record", () => {
+  const [alpha, bravo, charlie] = [initialPlayers[0]!, initialPlayers[1]!, initialPlayers[2]!];
+  const own = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: `Own ${index + 1}`, elixirCost: 3 }));
+  const faced = Array.from({ length: 8 }, (_, index) => ({ id: index + 101, name: `Faced ${index + 1}`, elixirCost: 4 }));
+  const evolved = [{ ...own[0]!, evolutionLevel: 1 }, ...own.slice(1)].reverse();
+  const seeded = async () => {
+    const service = serviceWithLogs({ logs: { [alpha.tag]: [
+      { ...battle([participant(alpha, 3, own)], [participant(bravo, 0, faced)], "20260908T203000.000Z", "Ladder"), type: "PvP", deckSelection: "collection" },
+      { ...battle([participant(alpha, 0, evolved)], [participant(bravo, 1, faced)], "20260907T203000.000Z", "MirrorDeck_Friendly"), deckSelection: "predefined" },
+      { ...battle([participant(alpha, 1, evolved)], [participant(charlie, 2, faced)], "20260906T233000.000Z", "Ladder"), type: "PvP", deckSelection: "collection" },
+    ] } });
+    await service.syncNow([alpha.tag]);
+    return service;
+  };
+  const insights = (service: TrackerService, actor: string, visible: string[], filters = {}) => service.getInsights({ actorProfileId: actor, visibleProfileIds: new Set(visible), filters });
+
+  it("reports the focus player's chosen-deck baseline and every rivalry result inside the visible scope", async () => {
+    const result = insights(await seeded(), "a", ["a", "b"], { tzOffsetMinutes: 60 });
+    expect(result).toMatchObject({ generatedAt: Date.parse("2026-09-08T20:40:00Z"), filters: { playerTag: alpha.tag, rivalTag: null, includeAssigned: false, tzOffsetMinutes: 60 }, sample: { games: 3 }, baseline: { games: 2, wins: 1, losses: 1 } });
+    expect(result.completenessNotice).toContain("rolling window");
+    expect(result.filterOptions.players.map((player) => player.tag).sort()).toEqual([alpha.tag, bravo.tag].sort());
+    expect(result.time.byWeekday[1]).toMatchObject({ label: "Monday", games: 2 });
+    expect(result.rivalries).toHaveLength(1);
+    expect(result.rivalries[0]).toMatchObject({ rival: { tag: bravo.tag, displayName: "Bravo" }, versus: { games: 2, wins: 1, losses: 1 }, versusChosen: { games: 1, wins: 1 }, versusAssigned: { games: 1, losses: 1 }, threeCrownWins: 1, currentStreak: { kind: "win", length: 1 } });
+    expect(result.cards.find((entry) => entry.card.id === 101)?.againstCard).toMatchObject({ games: 2, wins: 1, losses: 1 });
+    expect(result.cards[0]!.card).not.toHaveProperty("level");
+  });
+
+  it("ignores a rival or player outside the visible scope", async () => {
+    const service = await seeded();
+    expect(insights(service, "a", ["a", "b"], { rivalTag: bravo.tag }).filters.rivalTag).toBe(bravo.tag);
+    const hidden = insights(service, "a", ["a", "b"], { rivalTag: charlie.tag });
+    expect(hidden.filters.rivalTag).toBeNull();
+    expect(JSON.stringify(hidden.rivalries)).not.toContain(charlie.tag);
+    expect(insights(service, "a", ["a", "b"], { rivalTag: alpha.tag }).filters.rivalTag).toBeNull();
+    expect(insights(service, "a", ["a"], { playerTag: bravo.tag }).filters.playerTag).toBe(alpha.tag);
+    const outsider = insights(service, "c", ["c"], { playerTag: alpha.tag, rivalTag: alpha.tag, tzOffsetMinutes: 9_000 });
+    expect(outsider).toMatchObject({ filters: { playerTag: charlie.tag, rivalTag: null, tzOffsetMinutes: 0 }, sample: { games: 1, wins: 1 }, rivalries: [] });
+    expect(service.getCardStats({ actorProfileId: "c", visibleProfileIds: new Set(["c"]), playerTag: alpha.tag }).playerTag).toBe(charlie.tag);
+  });
+
+  it("collapses card forms for the deck builder and matches a deck whatever its forms or order", async () => {
+    const service = await seeded();
+    const scope = { actorProfileId: "a", visibleProfileIds: new Set(["a"]) };
+    const stats = service.getCardStats({ ...scope, playerTag: alpha.tag });
+    expect(stats).toMatchObject({ playerTag: alpha.tag, baseline: { games: 2, wins: 1, losses: 1 } });
+    expect(stats.cards["1"]).toMatchObject({ id: 1, key: "own-1", name: "Own 1", with: { games: 2, wins: 1, losses: 1 }, against: { games: 0 } });
+    expect(stats.cards["1"]!.forms.map((entry) => entry.form).sort()).toEqual(["base", "evolution"]);
+    expect(stats.cards["101"]!.against).toMatchObject({ games: 2, winRate: 0.5 });
+    const record = service.getDeckRecord({ ...scope, playerTag: alpha.tag, cards: "8,7,6,5,4,3,2,1" });
+    expect(record).toMatchObject({ playerTag: alpha.tag, cardIds: [1, 2, 3, 4, 5, 6, 7, 8], chosen: { games: 2, wins: 1, losses: 1 }, assigned: { games: 1, losses: 1 } });
+    expect(record.recent).toEqual([
+      { battleTime: "2026-09-08T20:30:00.000Z", modeName: "Ladder", result: "win", origin: "chosen" },
+      { battleTime: "2026-09-07T20:30:00.000Z", modeName: "MirrorDeck_Friendly", result: "loss", origin: "assigned" },
+      { battleTime: "2026-09-06T23:30:00.000Z", modeName: "Ladder", result: "loss", origin: "chosen" },
+    ]);
+    for (const cards of ["1,2,3", "1,1,2,3,4,5,6,7", "0,1,2,3,4,5,6,7", "1,2,3,4,5,6,7,x", "1,2,3,4,5,6,7,8,9", undefined, 12_345_678]) {
+      expect(() => service.getDeckRecord({ ...scope, cards })).toThrow(expect.objectContaining({ status: 400, code: "INVALID_INPUT" }));
+    }
+  });
+
+  it("serves the three routes behind authentication and rejects malformed query values", async () => {
+    const tracker = await seeded();
+    const social = { authenticate: () => ({ profile: { id: "a" }, token: "token" }), getState: () => ({ friends: [{ id: "b" }] }) } as unknown as SocialService;
+    const app = express(); app.use(express.json()); app.use(createTrackerRouter(tracker, social));
+    const get = (url: string) => request(app).get(url).set("Authorization", "Bearer token");
+    await request(app).get("/api/tracker/insights").expect(401);
+    const ok = await get(`/api/tracker/insights?rivalTag=${encodeURIComponent(bravo.tag)}&includeAssigned=1&tzOffsetMinutes=-300&mode=${encodeURIComponent("72000006:Ladder")}`).expect(200);
+    expect(ok.body.insights).toMatchObject({ filters: { playerTag: alpha.tag, rivalTag: bravo.tag, includeAssigned: true, tzOffsetMinutes: -300, mode: "72000006:Ladder" }, sample: { games: 2 }, rivalries: [{ versus: { games: 1 } }] });
+    expect((await get("/api/tracker/insights?includeAssigned=yes").expect(200)).body.insights.filters.includeAssigned).toBe(false);
+    for (const offset of ["abc", "841", "-900", "1.5", ""]) await get(`/api/tracker/insights?tzOffsetMinutes=${offset}`).expect(400, { error: "tzOffsetMinutes must be an integer from -840 to 840", code: "INVALID_INPUT" });
+    expect((await get("/api/tracker/card-stats").expect(200)).body.cardStats).toMatchObject({ playerTag: alpha.tag, baseline: { games: 2 } });
+    expect((await get("/api/tracker/deck-record?cards=1,2,3,4,5,6,7,8").expect(200)).body.deckRecord).toMatchObject({ chosen: { games: 2 }, assigned: { games: 1 } });
+    await get("/api/tracker/deck-record?cards=1,2,3").expect(400);
+    await get("/api/tracker/deck-record").expect(400);
+  });
+});
+
 describe("tracker HTTP privacy", () => {
   it("rejects unauthenticated summary access before reading tracker data", async () => {
     const tracker = createTrackerService({ databasePath: ":memory:", getPlayers: () => initialPlayers, autoStart: false }); services.push(tracker);

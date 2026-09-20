@@ -10,16 +10,19 @@ import type {
   TrackerBattleResult,
   TrackerCard,
   TrackerCardForm,
+  TrackerCardStats,
   TrackerCardTally,
   TrackerCoverage,
   TrackerDeckLog,
   TrackerDeckLogEntry,
   TrackerDeckLogMode,
-  TrackerDeckOrigin,
   TrackerDeckMatchupTally,
+  TrackerDeckRecord,
   TrackerDeckTally,
   TrackerFilters,
   TrackerImportResult,
+  TrackerInsights,
+  TrackerInsightsFilters,
   TrackerModeTally,
   TrackerPairTally,
   TrackerParticipant,
@@ -32,6 +35,10 @@ import type {
   TrackerTally,
   UndoManualTrackerResultResponse,
 } from "@draft-royale/shared";
+import { buildCardStats, buildDeckRecord, buildInsights } from "./insights.js";
+import { addResult, bareCard, deckOriginOf, deckSignature, emptyTally, finalizeTally } from "./tally.js";
+
+export { deckOriginOf };
 
 const DEFAULT_API_BASE_URL = "https://proxy.royaleapi.dev/v1";
 const DEFAULT_QUICK_POLL_MS = 60_000;
@@ -45,6 +52,8 @@ const MAX_RECENT_BATTLES = 100;
 const MANUAL_SYNC_COOLDOWN_MS = 30_000;
 const ACTIVE_WINDOW_MS = 10 * 60_000;
 const PROFILE_SNAPSHOT_IDLE_MS = 6 * 60 * 60_000;
+const MAX_TZ_OFFSET_MINUTES = 14 * 60;
+const COMPLETENESS_NOTICE = "Recorded observations are not an all-time record. The official battle log is a recent rolling window; outages and time before tracking can be missing.";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -125,6 +134,18 @@ export interface TrackerSummaryRequest {
   filters?: Partial<TrackerFilters>;
 }
 
+export interface TrackerInsightsRequest {
+  actorProfileId: string;
+  visibleProfileIds: ReadonlySet<string>;
+  filters?: Partial<TrackerInsightsFilters>;
+}
+
+export interface TrackerPlayerRequest {
+  actorProfileId: string;
+  visibleProfileIds: ReadonlySet<string>;
+  playerTag?: unknown;
+}
+
 export interface ParsedHistoricalImport {
   inputRows: number;
   rejectedRows: number;
@@ -157,6 +178,9 @@ export interface TrackerService {
   requestSync(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, rawTag?: unknown): Promise<TrackerPollStatus>;
   getBattleCountAudit(visibleProfileIds: ReadonlySet<string>, rawTag: unknown): TrackerBattleCountAudit;
   getDeckLog(request: { actorProfileId: string; visibleProfileIds: ReadonlySet<string>; playerTag?: unknown }): TrackerDeckLog;
+  getInsights(request: TrackerInsightsRequest): TrackerInsights;
+  getCardStats(request: TrackerPlayerRequest): TrackerCardStats;
+  getDeckRecord(request: TrackerPlayerRequest & { cards: unknown }): TrackerDeckRecord;
   importHistorical(parsed: ParsedHistoricalImport, kind: "operator_snapshot" | "user_import", label?: string): TrackerImportResult;
   addManualResult(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, input: unknown): ManualTrackerResultResponse;
   undoManualResult(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, battleId: unknown, input: unknown): UndoManualTrackerResultResponse;
@@ -218,8 +242,6 @@ const parseCards = (value: unknown): TrackerCard[] => Array.isArray(value) ? val
   const name = text(candidate.name, "Unknown card");
   return [{ id: integer(candidate.id), key: slugifyCardName(name) || `card-${integer(candidate.id) ?? "unknown"}`, name, form: parseCardForm(candidate), elixirCost: finite(candidate.elixirCost), level: integer(candidate.level), maxLevel: integer(candidate.maxLevel) } satisfies TrackerCard];
 }) : [];
-// Tallies group a card across many battles, so a single battle's level would be misleading there.
-const bareCard = ({ id, key, name, form, elixirCost }: TrackerCard): TrackerCard => ({ id, key, name, form, elixirCost });
 const stripIconUrls = (value: unknown) => JSON.stringify(value, (key, entry: unknown) => key === "iconUrls" ? undefined : entry);
 const flag = (value: unknown): boolean | null => typeof value === "boolean" ? value : null;
 
@@ -228,16 +250,6 @@ const canonicalBattleKey = (battleTime: string, type: string, modeId: number | n
   const teamSignatures = canonicalTeamSignatures(teams).sort();
   return sha256(JSON.stringify([battleTime, type.toLowerCase(), modeId ?? modeName.toLowerCase(), teamSignatures]));
 };
-const deckSignature = (cards: TrackerCard[]) => [...cards]
-  .sort((left, right) => `${left.id ?? left.key}:${left.form}`.localeCompare(`${right.id ?? right.key}:${right.form}`))
-  .map((card) => `${card.id ?? card.key}:${card.form}`).join("|");
-
-const CHOSEN_DECK_SELECTIONS = new Set(["collection", "warDeckPick", "quadDeckPick"]);
-/** Battles recorded before deckSelection was kept fall back to the mode name, which names mirror, draft and pick modes. */
-export const deckOriginOf = (deckSelection: string | null | undefined, modeName: string): { origin: TrackerDeckOrigin; inferred: boolean } =>
-  deckSelection
-    ? { origin: CHOSEN_DECK_SELECTIONS.has(deckSelection) ? "chosen" : "assigned", inferred: false }
-    : { origin: /mirror|draft|pickmode/i.test(modeName) ? "assigned" : "chosen", inferred: true };
 
 const resultForSide = (side: 0 | 1, teamCrowns: [number | null, number | null]): TrackerBattleResult => {
   const own = teamCrowns[side];
@@ -332,19 +344,6 @@ export const parseHistoricalImport = (value: unknown, importedAt: number, kind: 
   return { inputRows, rejectedRows, battles, earliestBattleAt: times[0] ?? null, latestBattleAt: times.at(-1) ?? null, sourceLabel };
 };
 
-const emptyTally = (): TrackerTally => ({ games: 0, wins: 0, losses: 0, draws: 0, unknown: 0, winRate: null });
-const addResult = <T extends TrackerTally>(tally: T, result: TrackerBattleResult) => {
-  tally.games += 1;
-  if (result === "win") tally.wins += 1;
-  else if (result === "loss") tally.losses += 1;
-  else if (result === "draw") tally.draws += 1;
-  else tally.unknown += 1;
-};
-const finalizeTally = <T extends TrackerTally>(tally: T): T => {
-  const decided = tally.wins + tally.losses + tally.draws;
-  tally.winRate = decided > 0 ? tally.wins / decided : null;
-  return tally;
-};
 const pairKey = (left: string, right: string) => left < right ? `${left}\u0000${right}` : `${right}\u0000${left}`;
 
 const requireCommandId = (value: unknown) => {
@@ -609,12 +608,15 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
     return projectBattle(row, participantRows);
   };
 
-  const visibleBattles = (actorProfileId: string, visibleProfileIds: ReadonlySet<string>) => {
+  // Insights only ever read one player's battles, so `participantTag` keeps them from loading every visible player's history.
+  const visibleBattles = (actorProfileId: string, visibleProfileIds: ReadonlySet<string>, participantTag?: string) => {
     const tags = visibleTags(visibleProfileIds);
-    const rows = db.prepare(`SELECT ${BATTLE_COLUMNS} FROM tracker_battles WHERE undone_at IS NULL ORDER BY battle_time DESC`).all() as unknown as BattleRow[];
+    const played = participantTag ? " AND id IN (SELECT battle_id FROM tracker_participants WHERE player_tag = ?)" : "";
+    const scope = participantTag ? [participantTag] : [];
+    const rows = db.prepare(`SELECT ${BATTLE_COLUMNS} FROM tracker_battles WHERE undone_at IS NULL${played} ORDER BY battle_time DESC`).all(...scope) as unknown as BattleRow[];
     if (rows.length === 0 || visibleProfileIds.size === 0) return [];
     const participants = db.prepare(`SELECT ${PARTICIPANT_COLUMNS} FROM tracker_participants
-      WHERE battle_id IN (SELECT id FROM tracker_battles WHERE undone_at IS NULL) ORDER BY battle_id,side,position`).all() as unknown as ParticipantRow[];
+      WHERE battle_id IN (SELECT id FROM tracker_battles WHERE undone_at IS NULL${played}) ORDER BY battle_id,side,position`).all(...scope) as unknown as ParticipantRow[];
     const byBattle = new Map<string, ParticipantRow[]>();
     for (const participant of participants) { const list = byBattle.get(participant.battle_id); if (list) list.push(participant); else byBattle.set(participant.battle_id, [participant]); }
     return rows.flatMap((row) => {
@@ -782,7 +784,7 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
     const byGames = <T extends TrackerTally>(left: T, right: T) => right.games - left.games || right.losses - left.losses;
     return {
       generatedAt: now(), scope: "rolling_observations",
-      completenessNotice: "Recorded observations are not an all-time record. The official battle log is a recent rolling window; outages and time before tracking can be missing.",
+      completenessNotice: COMPLETENESS_NOTICE,
       poll: getStatus(), filters, filterOptions: { players, modes: [...modeOptions.entries()].map(([key, name]) => ({ key, name })).sort((left, right) => left.name.localeCompare(right.name)) },
       coverage: getCoverage(filters.playerTag, allBattles), sample: finalizeTally(sample),
       players: [...playerTallies.values()].map(finalizeTally).sort(byGames), headToHead: [...h2h.values()].map(finalizeTally).sort(byGames), coPlay: [...coPlay.values()].map(finalizeTally).sort(byGames),
@@ -828,6 +830,37 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
     const decks = [...entries.entries()].map(([key, entry]) => finalizeTally({ ...entry, deckSelections: entry.deckSelections.sort(), modes: [...modesByEntry.get(key)!.values()].map(finalizeTally).sort((left, right) => right.games - left.games) }))
       .sort((left, right) => right.lastUsedAt.localeCompare(left.lastUsedAt)).slice(0, 500);
     return { generatedAt: now(), playerTag, players, battlesWithDecks, decks };
+  };
+
+  const getInsights = (request: TrackerInsightsRequest): TrackerInsights => {
+    ensureOpen(); reconcileSubscriptions();
+    const players = visiblePlayers(request.visibleProfileIds);
+    const raw = request.filters ?? {};
+    const { playerTag, mode, dateFrom, dateTo } = normalizeFilters(players, request.actorProfileId, { playerTag: raw.playerTag, mode: raw.mode, dateFrom: raw.dateFrom, dateTo: raw.dateTo });
+    const rival = normalizeTrackerTag(raw.rivalTag);
+    const offset = raw.tzOffsetMinutes;
+    const filters: TrackerInsightsFilters = {
+      playerTag, rivalTag: rival !== playerTag && players.some((player) => player.tag === rival) ? rival : null, mode, dateFrom, dateTo, includeAssigned: raw.includeAssigned === true,
+      tzOffsetMinutes: typeof offset === "number" && Number.isInteger(offset) && Math.abs(offset) <= MAX_TZ_OFFSET_MINUTES ? offset : 0,
+    };
+    return { generatedAt: now(), completenessNotice: COMPLETENESS_NOTICE, ...buildInsights(playerTag ? visibleBattles(request.actorProfileId, request.visibleProfileIds, playerTag) : [], players, filters) };
+  };
+
+  const focusBattles = (request: TrackerPlayerRequest) => {
+    ensureOpen(); reconcileSubscriptions();
+    const playerTag = normalizeFilters(visiblePlayers(request.visibleProfileIds), request.actorProfileId, { playerTag: normalizeTrackerTag(request.playerTag) }).playerTag;
+    return { playerTag, battles: playerTag ? visibleBattles(request.actorProfileId, request.visibleProfileIds, playerTag) : [] };
+  };
+  const getCardStats = (request: TrackerPlayerRequest): TrackerCardStats => {
+    const { playerTag, battles } = focusBattles(request);
+    return { generatedAt: now(), playerTag, ...buildCardStats(battles, playerTag) };
+  };
+  const getDeckRecord = (request: TrackerPlayerRequest & { cards: unknown }): TrackerDeckRecord => {
+    const parts = typeof request.cards === "string" ? request.cards.split(",").map((part) => part.trim()) : [];
+    const cardIds = parts.filter((part) => /^[1-9]\d{0,9}$/.test(part)).map(Number);
+    if (parts.length !== 8 || cardIds.length !== 8 || new Set(cardIds).size !== 8) throw new TrackerError(400, "cards must be eight distinct card ids separated by commas", "INVALID_INPUT");
+    const { playerTag, battles } = focusBattles(request);
+    return { generatedAt: now(), playerTag, ...buildDeckRecord(battles, playerTag, cardIds) };
   };
 
   const commandReplay = (actorProfileId: string, commandId: string, action: string, hash: string) => {
@@ -1086,5 +1119,5 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
 
   reconcileSubscriptions();
   if (autoStart && apiToken) schedule();
-  return { getRegisteredPlayers, getStatus, getSummary, syncNow, requestSync, getBattleCountAudit, getDeckLog, importHistorical, addManualResult, undoManualResult, close };
+  return { getRegisteredPlayers, getStatus, getSummary, syncNow, requestSync, getBattleCountAudit, getDeckLog, getInsights, getCardStats, getDeckRecord, importHistorical, addManualResult, undoManualResult, close };
 };

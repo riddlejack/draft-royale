@@ -288,3 +288,261 @@ export interface TrackerImportResult {
   latestBattleAt: string | null;
   provenanceKind: "operator_snapshot" | "user_import";
 }
+
+export interface TrackerInsightsFilters {
+  playerTag: string;
+  rivalTag: string | null;
+  mode: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+  /** Card, deck, level, elixir and matchup insights count only decks the player built unless this is set. Results-only insights always count every battle. */
+  includeAssigned: boolean;
+  /** Minutes added to UTC to reach the viewer's local time; drives hour, weekday and month buckets. */
+  tzOffsetMinutes: number;
+}
+
+/** Wilson 95% score interval for a win rate over decided games (wins + losses + draws). */
+export interface TrackerRateInterval {
+  lower: number;
+  upper: number;
+}
+
+export interface TrackerCardInsight {
+  card: TrackerCard;
+  /** The focus player's record when their own deck held this card. */
+  withCard: TrackerTally;
+  /** The focus player's record when an opposing deck held this card, counted once per battle. */
+  againstCard: TrackerTally;
+  /** Win rate minus the baseline win rate; null when either side has no decided game. */
+  withDelta: number | null;
+  againstDelta: number | null;
+  withInterval: TrackerRateInterval | null;
+  againstInterval: TrackerRateInterval | null;
+}
+
+/** A numeric range with its record. `min` and `max` are the range's display bounds; null means unbounded. */
+export interface TrackerInsightBucket extends TrackerTally {
+  key: string;
+  label: string;
+  min: number | null;
+  max: number | null;
+}
+
+/** Gap = the focus deck's mean (maxLevel - level) minus the opponent's, so a positive gap means the focus player was under-levelled. */
+export interface TrackerLevelGapInsight {
+  battles: number;
+  meanGap: number | null;
+  buckets: TrackerInsightBucket[];
+}
+
+export interface TrackerTrophyPoint {
+  battleId: string;
+  battleTime: string;
+  trophies: number;
+  change: number;
+  modeName: string;
+  type: string;
+}
+
+export interface TrackerTrophySeries {
+  type: string;
+  points: TrackerTrophyPoint[];
+}
+
+/** Sessions are built from every recorded battle of the focus player; only battles passing the mode and date filters are tallied. */
+export interface TrackerTiltInsight {
+  sessionGapMinutes: number;
+  /** Sessions holding at least one tallied battle, and the median number of battles (of any mode) in them. */
+  sessionCount: number;
+  medianSessionLength: number | null;
+  /** Keys "0", "1", "2", "3+": consecutive losses directly before the battle within its session. */
+  byPriorLosses: TrackerInsightBucket[];
+  /** Keys "1-3", "4-6", "7-10", "11+": the battle's position within its session. */
+  byPosition: TrackerInsightBucket[];
+}
+
+export interface TrackerHourTally extends TrackerTally {
+  hour: number;
+}
+
+export interface TrackerWeekdayTally extends TrackerTally {
+  /** 0 = Sunday … 6 = Saturday, in the viewer's local time. */
+  weekday: number;
+  label: string;
+}
+
+export interface TrackerTimeInsight {
+  byHour: TrackerHourTally[];
+  byWeekday: TrackerWeekdayTally[];
+}
+
+export interface TrackerElixirLeakStat {
+  games: number;
+  meanLeaked: number | null;
+}
+
+export interface TrackerElixirLeakInsight {
+  wins: TrackerElixirLeakStat;
+  losses: TrackerElixirLeakStat;
+}
+
+export interface TrackerTowerTroopTally extends TrackerTally {
+  card: TrackerCard;
+}
+
+/** Each battle counts once per band or tower troop it faced, so a 2v2 can appear in two rows. */
+export interface TrackerMatchupInsight {
+  byElixirBand: TrackerInsightBucket[];
+  byTowerTroop: TrackerTowerTroopTally[];
+}
+
+export interface TrackerStreak {
+  kind: "win" | "loss" | "none";
+  length: number;
+}
+
+export interface TrackerMonthTally extends TrackerTally {
+  /** YYYY-MM in the viewer's local time. */
+  month: string;
+}
+
+export interface TrackerRivalryModeTally extends TrackerModeTally {
+  /** Same key format as TrackerFilterOptions.modes, so a row can become a mode filter. */
+  modeKey: string;
+}
+
+export interface TrackerRivalryDeckTally extends TrackerDeckTally {
+  origin: TrackerDeckOrigin;
+}
+
+export interface TrackerDuoDeckTally extends TrackerTally {
+  ownSignature: string;
+  ownCards: TrackerCard[];
+  partnerSignature: string;
+  partnerCards: TrackerCard[];
+}
+
+export interface TrackerRivalryMeeting {
+  battleId: string;
+  battleTime: string;
+  modeName: string;
+  type: string;
+  unit: TrackerBattleUnit;
+  deckSelection: string | null;
+  deckOrigin: TrackerDeckOrigin;
+  result: TrackerBattleResult;
+  crownsFor: number | null;
+  crownsAgainst: number | null;
+}
+
+export interface TrackerRivalryAlongside {
+  tally: TrackerTally;
+  byMode: TrackerRivalryModeTally[];
+  duoDecks: TrackerDuoDeckTally[];
+}
+
+/** Every tally is the focus player's result. Results count every deck origin; the deck and card lists follow `includeAssigned`. */
+export interface TrackerRivalry {
+  rival: TrackerPlayer;
+  sharedBattles: number;
+  versus: TrackerTally;
+  versusChosen: TrackerTally;
+  versusAssigned: TrackerTally;
+  versusByMode: TrackerRivalryModeTally[];
+  versusByMonth: TrackerMonthTally[];
+  currentStreak: TrackerStreak;
+  longestWinStreak: number;
+  longestLossStreak: number;
+  /** Crown totals cover only the `crownGames` meetings where both crown counts were recorded. */
+  crownGames: number;
+  crownsFor: number;
+  crownsAgainst: number;
+  threeCrownWins: number;
+  threeCrownLosses: number;
+  ownDecks: TrackerRivalryDeckTally[];
+  rivalDecks: TrackerRivalryDeckTally[];
+  rivalCards: TrackerCardTally[];
+  recentMeetings: TrackerRivalryMeeting[];
+  alongside: TrackerRivalryAlongside;
+}
+
+export interface TrackerInsights {
+  generatedAt: number;
+  completenessNotice: string;
+  filters: TrackerInsightsFilters;
+  filterOptions: TrackerFilterOptions;
+  /** Every battle passing the mode and date filters; the base for trophies, tilt, time and rivalries. */
+  sample: TrackerTally;
+  /** Non-duel battles with an eight-card deck the player built (or any origin with includeAssigned); the base for cards, level gap, elixir and matchups. */
+  baseline: TrackerTally;
+  cards: TrackerCardInsight[];
+  /** Cards need this many decided games against them to rank as a blind spot or strength. */
+  rankingMinDecided: number;
+  /** Below-baseline cards, ordered by the Wilson upper bound so small samples sink. */
+  blindSpots: TrackerCardInsight[];
+  /** Above-baseline cards, ordered by the Wilson lower bound. */
+  strengths: TrackerCardInsight[];
+  levelGap: TrackerLevelGapInsight;
+  trophyTimeline: TrackerTrophySeries[];
+  tilt: TrackerTiltInsight;
+  time: TrackerTimeInsight;
+  elixirLeaked: TrackerElixirLeakInsight;
+  matchups: TrackerMatchupInsight;
+  rivalries: TrackerRivalry[];
+}
+
+export interface TrackerInsightsResponse {
+  insights: TrackerInsights;
+}
+
+export interface TrackerCardFormStat {
+  form: TrackerCardForm;
+  with: TrackerTally;
+  against: TrackerTally;
+}
+
+/** One card across all of its forms, from battles where the player built the deck. */
+export interface TrackerCardStat {
+  id: number | null;
+  key: string;
+  name: string;
+  elixirCost: number | null;
+  with: TrackerTally;
+  against: TrackerTally;
+  withDelta: number | null;
+  againstDelta: number | null;
+  forms: TrackerCardFormStat[];
+}
+
+export interface TrackerCardStats {
+  generatedAt: number;
+  playerTag: string;
+  baseline: TrackerTally;
+  /** Keyed by card id (or card key when the API gave no id). */
+  cards: Record<string, TrackerCardStat>;
+}
+
+export interface TrackerCardStatsResponse {
+  cardStats: TrackerCardStats;
+}
+
+export interface TrackerDeckRecordBattle {
+  battleTime: string;
+  modeName: string;
+  result: TrackerBattleResult;
+  origin: TrackerDeckOrigin;
+}
+
+/** The record of one exact eight-card set, ignoring card forms and order. */
+export interface TrackerDeckRecord {
+  generatedAt: number;
+  playerTag: string;
+  cardIds: number[];
+  chosen: TrackerTally;
+  assigned: TrackerTally;
+  recent: TrackerDeckRecordBattle[];
+}
+
+export interface TrackerDeckRecordResponse {
+  deckRecord: TrackerDeckRecord;
+}

@@ -17,6 +17,14 @@ const visibleProfiles = (auth: AuthenticatedSocialProfile, social: SocialService
 };
 
 const queryText = (value: unknown) => typeof value === "string" && value.length <= 100 ? value : undefined;
+const queryFlag = (value: unknown) => value === "1" || value === "true";
+// A silently ignored offset would put every hour and weekday bucket in the wrong place, so a bad one is rejected.
+const queryTzOffset = (value: unknown) => {
+  if (value === undefined) return undefined;
+  const offset = typeof value === "string" && /^-?\d{1,3}$/.test(value) ? Number(value) : Number.NaN;
+  if (!(Math.abs(offset) <= 840)) throw new TrackerError(400, "tzOffsetMinutes must be an integer from -840 to 840", "INVALID_INPUT");
+  return offset;
+};
 
 export const createTrackerRouter = (tracker: TrackerService, social: SocialService): Router => {
   const router = express.Router();
@@ -66,6 +74,21 @@ export const createTrackerRouter = (tracker: TrackerService, social: SocialServi
     },
   }) })));
   router.get("/api/tracker/decks", authenticated((auth, scope, request, response) => response.json({ deckLog: tracker.getDeckLog({ actorProfileId: auth.profile.id, visibleProfileIds: scope, playerTag: queryText(request.query.playerTag) }) })));
+  router.get("/api/tracker/insights", authenticated((auth, scope, request, response) => response.json({ insights: tracker.getInsights({
+    actorProfileId: auth.profile.id,
+    visibleProfileIds: scope,
+    filters: {
+      playerTag: queryText(request.query.playerTag),
+      rivalTag: queryText(request.query.rivalTag),
+      mode: queryText(request.query.mode),
+      dateFrom: queryText(request.query.dateFrom),
+      dateTo: queryText(request.query.dateTo),
+      includeAssigned: queryFlag(request.query.includeAssigned),
+      tzOffsetMinutes: queryTzOffset(request.query.tzOffsetMinutes),
+    },
+  }) })));
+  router.get("/api/tracker/card-stats", authenticated((auth, scope, request, response) => response.json({ cardStats: tracker.getCardStats({ actorProfileId: auth.profile.id, visibleProfileIds: scope, playerTag: queryText(request.query.playerTag) }) })));
+  router.get("/api/tracker/deck-record", authenticated((auth, scope, request, response) => response.json({ deckRecord: tracker.getDeckRecord({ actorProfileId: auth.profile.id, visibleProfileIds: scope, playerTag: queryText(request.query.playerTag), cards: queryText(request.query.cards) }) })));
   router.get("/api/tracker/battle-count-audit", authenticated((_auth, scope, request, response) => response.json({ audit: tracker.getBattleCountAudit(scope, queryText(request.query.playerTag)) })));
   router.post("/api/tracker/sync", authenticated(async (auth, scope, request, response) =>
     response.status(202).json({ status: await tracker.requestSync(auth.profile.id, scope, request.body?.playerTag) })));
