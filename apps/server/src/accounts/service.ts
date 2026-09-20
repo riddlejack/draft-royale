@@ -152,6 +152,10 @@ export function createAccountService(options: AccountServiceOptions) {
       email TEXT, display_name TEXT, created_at INTEGER NOT NULL,
       PRIMARY KEY(provider, subject), UNIQUE(profile_id, provider)
     );
+    CREATE TABLE IF NOT EXISTS account_google_challenges (
+      state_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL, consumed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS account_google_challenges_expiry ON account_google_challenges(expires_at, consumed_at);
   `);
   db.prepare("INSERT INTO club_account_meta(key,value) VALUES('account_schema_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
     .run(String(ACCOUNT_SCHEMA_VERSION));
@@ -172,17 +176,8 @@ export function createAccountService(options: AccountServiceOptions) {
   // Convert the former deterministic account bearer into an ordinary revocable session.
   for (const row of rows()) {
     const expectedToken = credentialFor(row.username, row.credential_version);
-    const expectedHash = sha256(expectedToken);
-    if (row.password_version >= 1) {
-      const createdAt = now();
-      const migrated = options.social.retirePrimaryCredential(row.profile_id, expectedToken, disabledHashFor(row), "account-session", createdAt + SESSION_TTL_MS);
-      if (migrated || options.social.hasCredential(row.profile_id, expectedToken)) {
-        db.prepare("INSERT OR IGNORE INTO account_sessions(id,profile_id,token_hash,created_at,expires_at,last_used_at) VALUES(?,?,?,?,?,?)")
-          .run(`as_legacy_${sha256(row.profile_id).slice(0, 24)}`, row.profile_id, expectedHash, createdAt, createdAt + SESSION_TTL_MS, createdAt);
-      }
-    } else {
-      options.social.retirePrimaryCredential(row.profile_id, expectedToken, disabledHashFor(row));
-    }
+    // A copied legacy database contains the HMAC secret, so never carry its deterministic bearer forward.
+    options.social.retirePrimaryCredential(row.profile_id, expectedToken, disabledHashFor(row));
   }
 
   const recoveryHash = (code: string) => createHmac("sha256", secret).update(`account-recovery:${code}`).digest("hex");
@@ -285,17 +280,19 @@ export function createAccountService(options: AccountServiceOptions) {
   const touchSession = (token: string) => {
     db.prepare("UPDATE account_sessions SET last_used_at=? WHERE token_hash=? AND revoked_at IS NULL").run(now(), sha256(token));
   };
-  const logout = (profileId: string, token: string) => {
+  const logout = (token: string) => {
     const tokenHash = sha256(token);
-    const session = db.prepare("SELECT profile_id FROM account_sessions WHERE token_hash=? AND revoked_at IS NULL").get(tokenHash) as { profile_id: string } | undefined;
-    if (!session || session.profile_id !== profileId) throw new AccountError(401, "This session is no longer active.", "INVALID_SESSION");
+    const session = db.prepare("SELECT profile_id,revoked_at FROM account_sessions WHERE token_hash=?").get(tokenHash) as { profile_id: string; revoked_at: number | null } | undefined;
+    if (!session) throw new AccountError(401, "This session is not a Draft Royale account session.", "INVALID_SESSION");
+    if (session.revoked_at !== null) return { alreadyRevoked: true };
     const timestamp = now();
-    options.social.revokeCredential(profileId, token);
+    options.social.revokeCredential(session.profile_id, token);
     db.exec("BEGIN IMMEDIATE;");
     try {
       db.prepare("UPDATE account_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL").run(timestamp, tokenHash);
       db.exec("COMMIT;");
     } catch (error) { db.exec("ROLLBACK;"); throw error; }
+    return { alreadyRevoked: false };
   };
   const revokeAll = (profileId: string) => {
     const timestamp = now();
@@ -324,6 +321,20 @@ export function createAccountService(options: AccountServiceOptions) {
     const response = issueSession(rowForProfile(row.profile_id)!);
     return { ...response, recoveryCode: createRecovery(row.profile_id) };
   };
+  const rotateRecovery = (profileId: string, input: unknown) => {
+    const body = input as Record<string, unknown> | null;
+    const password = typeof body?.password === "string" && body.password.length <= 128 ? body.password : "";
+    const row = rowForProfile(profileId);
+    if (!row || !row.password_enabled || row.password_version < 1) {
+      throw new AccountError(409, "This account does not use a custom password recovery code.", "PASSWORD_NOT_ENABLED");
+    }
+    const hash = scryptSync(password, row.salt || "invalid-account-salt", 32);
+    const stored = Buffer.from(row.password_hash || "00".repeat(32), "hex");
+    if (stored.length !== hash.length || !timingSafeEqual(hash, stored)) {
+      throw new AccountError(401, "The current password is incorrect.", "INVALID_CREDENTIALS");
+    }
+    return { recoveryCode: createRecovery(profileId) };
+  };
   const updateTag = (profileId: string, value: unknown) => {
     const tag = tagOf(value);
     const changed = db.prepare("UPDATE club_accounts SET tag=? WHERE profile_id=?").run(tag, profileId);
@@ -350,7 +361,10 @@ export function createAccountService(options: AccountServiceOptions) {
     const expiresAt = now() + GOOGLE_CHALLENGE_TTL_MS;
     const payload = Buffer.from(JSON.stringify({ nonce, expiresAt })).toString("base64url");
     const signature = createHmac("sha256", secret).update(`google-challenge:${payload}`).digest("base64url");
-    return { state: `${payload}.${signature}`, nonce, expiresAt: new Date(expiresAt).toISOString() };
+    const state = `${payload}.${signature}`;
+    db.prepare("DELETE FROM account_google_challenges WHERE expires_at<? OR consumed_at IS NOT NULL").run(now() - GOOGLE_CHALLENGE_TTL_MS);
+    db.prepare("INSERT INTO account_google_challenges(state_hash,expires_at,consumed_at) VALUES(?,?,NULL)").run(sha256(state), expiresAt);
+    return { state, nonce, expiresAt: new Date(expiresAt).toISOString() };
   };
   const readGoogleChallenge = (state: unknown) => {
     if (typeof state !== "string" || state.length > 1_000) throw new AccountError(400, "Google sign-in challenge is invalid.", "INVALID_GOOGLE_CHALLENGE");
@@ -366,6 +380,9 @@ export function createAccountService(options: AccountServiceOptions) {
     if (typeof challenge.nonce !== "string" || typeof challenge.expiresAt !== "number" || challenge.expiresAt <= now()) {
       throw new AccountError(400, "Google sign-in challenge expired. Try again.", "GOOGLE_CHALLENGE_EXPIRED");
     }
+    const consumed = db.prepare("UPDATE account_google_challenges SET consumed_at=? WHERE state_hash=? AND consumed_at IS NULL AND expires_at>?")
+      .run(now(), sha256(state), now());
+    if (consumed.changes !== 1) throw new AccountError(400, "Google sign-in challenge was already used. Try again.", "GOOGLE_CHALLENGE_USED");
     return challenge as { nonce: string; expiresAt: number };
   };
   const googleLogin = async (input: unknown, linkProfileId?: string) => {
@@ -410,7 +427,7 @@ export function createAccountService(options: AccountServiceOptions) {
   };
 
   return {
-    login, register, recover, logout, forProfile, sessionFor, touchSession, updateTag, saveCollection,
+    login, register, recover, rotateRecovery, logout, forProfile, sessionFor, touchSession, updateTag, saveCollection,
     createGoogleChallenge, googleLogin,
     providerConfig: () => ({
       google: googleClientId ? { enabled: true, clientId: googleClientId } : { enabled: false },

@@ -19,6 +19,10 @@ const databasePath = process.env.ARENA_DATABASE_PATH ?? path.join(repoRoot, "dat
 mkdirSync(path.dirname(databasePath), { recursive: true });
 const arenaApp = createArenaApp({ catalog: catalog.cards, catalogVersion: catalog.version, catalogUpdatedAt: catalog.updatedAt, databasePath });
 const app = express();
+const trustLoopbackProxy = (address: string) => address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+// The packaged tunnel connects over loopback. Never trust forwarded client IPs from a non-local peer.
+app.set("trust proxy", trustLoopbackProxy);
+arenaApp.set("trust proxy", trustLoopbackProxy);
 const webRoot = process.env.DRAFT_ROYALE_WEB_ROOT ?? path.join(repoRoot, "apps/web/dist");
 app.disable("x-powered-by");
 app.use((_request, response, next) => {

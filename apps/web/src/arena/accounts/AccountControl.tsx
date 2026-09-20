@@ -15,6 +15,7 @@ import {
   logoutAccount,
   recoverAccount,
   registerAccount,
+  rotateAccountRecovery,
   rememberAccount,
   rememberedAccount,
   updateAccountTag,
@@ -112,6 +113,8 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [newRecoveryCode, setNewRecoveryCode] = useState("");
+  const [recoveryPassword, setRecoveryPassword] = useState("");
+  const [showRecoveryRotation, setShowRecoveryRotation] = useState(false);
 
   const acceptSession = useCallback((session: AccountSession, reload = false) => {
     if (!session.credential?.token || session.account.profileId !== session.credential.profileId) throw new Error("The account response was incomplete.");
@@ -202,7 +205,24 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
     try {
       await logoutAccount(identity.token);
       clearSocialIdentity(); forgetAccount(); storage.set("name", "Player"); window.location.reload();
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not sign out."); setPending(false); }
+    } catch (failure) {
+      if (failure instanceof AccountApiError && failure.status === 401) {
+        clearSocialIdentity(); forgetAccount(); storage.set("name", "Player"); window.location.reload(); return;
+      }
+      setError(failure instanceof Error ? `${failure.message} This device stayed signed in because the server could not confirm revocation.` : "Could not confirm sign out. This device stayed signed in.");
+      setPending(false);
+    }
+  }
+
+  async function rotateRecovery() {
+    const identity = readSocialIdentity();
+    if (!identity?.token) return;
+    setPending(true); setError("");
+    try {
+      const result = await rotateAccountRecovery(identity.token, recoveryPassword);
+      setRecoveryPassword(""); setShowRecoveryRotation(false); setNewRecoveryCode(result.recoveryCode);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not replace the recovery code."); }
+    finally { setPending(false); }
   }
 
   const switchMode = (next: typeof mode) => {
@@ -221,6 +241,7 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
           {account.tag ? <button className="royale-button gold full-width" disabled={pending} onClick={() => void importCollection()}><RefreshCw size={18} /> {pending ? "Importing…" : "Import profile collection"}</button> : <p className="club-account-hint">Add a public tag, then import the full profile inventory. More than one Draft Royale account may track the same tag.</p>}
           {providers?.google.enabled && providers.google.clientId && !account.providers.includes("google") ? <div className="club-provider-link"><span>Optional faster sign-in</span><GoogleSignIn clientId={providers.google.clientId} linkToken={readSocialIdentity()?.token} onSession={googleSession} onError={setError} /></div> : null}
           {account.providers.includes("google") ? <p className="club-connected"><Check size={15} /> Google sign-in connected</p> : null}
+          {account.passwordEnabled ? <div className="club-recovery-rotate">{showRecoveryRotation ? <><label>Current password<input type="password" value={recoveryPassword} onChange={(event) => setRecoveryPassword(event.target.value)} autoComplete="current-password" /></label><div><button className="royale-button blue" disabled={pending || !recoveryPassword} onClick={() => void rotateRecovery()}>Create new code</button><button className="text-button" disabled={pending} onClick={() => { setShowRecoveryRotation(false); setRecoveryPassword(""); }}>Cancel</button></div></> : <button className="text-button" onClick={() => setShowRecoveryRotation(true)}>Replace recovery code</button>}</div> : null}
           {notice ? <p className="club-account-notice" role="status">{notice}</p> : null}
           {error ? <p role="alert" className="club-account-error">{error}</p> : null}
           <button className="text-button club-sign-out" disabled={pending} onClick={() => void signOut()}>Sign out of this device</button>

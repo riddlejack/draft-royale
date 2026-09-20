@@ -51,7 +51,8 @@ describe("remembered player accounts", () => {
     }).expect(201);
     expect((await request(app).get("/api/decks/mine").set(firstBearer).expect(200)).body.decks).toHaveLength(1);
     expect((await request(app).get("/api/decks/mine").set(secondBearer).expect(200)).body.decks).toHaveLength(0);
-    await request(app).post("/api/accounts/logout").set(firstBearer).expect(200);
+    await request(app).post("/api/accounts/logout").set(firstBearer).expect(200, { ok: true, alreadyRevoked: false });
+    await request(app).post("/api/accounts/logout").set(firstBearer).expect(200, { ok: true, alreadyRevoked: true });
     await request(app).get("/api/accounts/session").set(firstBearer).expect(401);
     await request(app).get("/api/accounts/session").set(secondBearer).expect(200);
   });
@@ -161,6 +162,7 @@ describe("remembered player accounts", () => {
     expect(migrated.credential.profileId).toBe(legacy.account.profileId);
     expect(migrated.credential.token).not.toBe(migratedToken);
     await request(app).get("/api/accounts/session").set(oldBearer).expect(401);
+    await request(app).get("/api/accounts/session").set({ Authorization: `Bearer ${migratedToken}` }).expect(401);
     const migratedBearer = { Authorization: `Bearer ${migrated.credential.token}` };
     expect((await request(app).get("/api/social/state").set(migratedBearer).expect(200)).body.state.friends).toHaveLength(1);
     expect((await request(app).get("/api/decks/mine").set(migratedBearer).expect(200)).body.decks).toEqual([expect.objectContaining({ name: "Preserved deck" })]);
@@ -192,8 +194,15 @@ describe("remembered player accounts", () => {
     expect((await request(app).get("/api/accounts/session").set(firstBearer).expect(200)).body).toMatchObject({
       account: { tag: "#P0LYQ", profileId: registered.account.profileId }, collection,
     });
-    const recovered = await request(app).post("/api/accounts/recover").send({
+    await request(app).post("/api/accounts/recovery/rotate").set(firstBearer).send({ password: "wrong durable password" }).expect(401);
+    const rotated = await request(app).post("/api/accounts/recovery/rotate").set(firstBearer).send({ password: "first durable password" }).expect(200);
+    expect(rotated.body.recoveryCode).toMatch(/^DR-/);
+    expect(rotated.body.recoveryCode).not.toBe(registered.recoveryCode);
+    await request(app).post("/api/accounts/recover").send({
       username: "Recoverable", recoveryCode: registered.recoveryCode, newPassword: "replacement durable password",
+    }).expect(401);
+    const recovered = await request(app).post("/api/accounts/recover").send({
+      username: "Recoverable", recoveryCode: rotated.body.recoveryCode, newPassword: "replacement durable password",
     }).expect(200);
     expect(recovered.body.recoveryCode).toMatch(/^DR-/);
     expect(recovered.body.recoveryCode).not.toBe(registered.recoveryCode);
@@ -226,8 +235,12 @@ describe("remembered player accounts", () => {
     await agent.post("/api/accounts/google").send({ credential: "rejected", state: challenge.body.state }).expect(401);
     challenge = await agent.post("/api/accounts/google/challenge").send({}).expect(200);
     nonce = challenge.body.nonce;
+    const challengeCookie = String(challenge.headers["set-cookie"]?.[0] ?? "").split(";")[0] ?? "";
     const google = await agent.post("/api/accounts/google").send({ credential: "valid", state: challenge.body.state }).expect(201);
     expect(google.body.account).toMatchObject({ profileId: google.body.credential.profileId, tag: null, providers: ["google"], passwordEnabled: false });
+    const replay = await request(app).post("/api/accounts/google").set("Cookie", challengeCookie)
+      .send({ credential: "valid", state: challenge.body.state }).expect(400);
+    expect(replay.body).toMatchObject({ code: "GOOGLE_CHALLENGE_USED" });
     const custom = (app.locals.accountService as AccountService).register({ displayName: "Custom Friend", password: "custom durable password" });
     challenge = await agent.post("/api/accounts/google/challenge").send({}).expect(200);
     nonce = challenge.body.nonce;

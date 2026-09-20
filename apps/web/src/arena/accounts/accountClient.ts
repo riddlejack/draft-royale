@@ -70,6 +70,7 @@ export const getAccountSession = (token: string) => accountRequest<AccountSessio
 export const loginAccount = (username: string, password: string) => accountRequest<AccountSession>("/login", { body: { username, password } });
 export const registerAccount = (displayName: string, password: string) => accountRequest<AccountSession>("/register", { body: { displayName, password } });
 export const recoverAccount = (username: string, recoveryCode: string, newPassword: string) => accountRequest<AccountSession>("/recover", { body: { username, recoveryCode, newPassword } });
+export const rotateAccountRecovery = (token: string, password: string) => accountRequest<{ recoveryCode: string }>("/recovery/rotate", { body: { password }, token });
 export const logoutAccount = (token: string) => accountRequest<{ ok: true }>("/logout", { body: {}, token });
 export const updateAccountTag = (token: string, tag: string | null) => accountRequest<{ account: ClubAccount }>("/profile", { method: "PATCH", body: { tag }, token });
 export const saveAccountCollection = (token: string, collection: ArenaCollection) => accountRequest<{ collection: ArenaCollection }>("/collection", { method: "PUT", body: { collection }, token });

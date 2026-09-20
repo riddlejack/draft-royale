@@ -108,7 +108,6 @@ export interface SocialService {
   cancelInvite(auth: AuthenticatedSocialProfile, inviteId: unknown, input: { commandId: unknown }): { invite: SocialInvite; state: SocialState };
   getInviteSession(auth: AuthenticatedSocialProfile, inviteId: unknown): SocialSessionResponse;
   addCredential(profileId: string, token: string, kind: string, expiresAt: number | null): void;
-  hasCredential(profileId: string, token: string): boolean;
   retirePrimaryCredential(profileId: string, token: string, replacementHash: string, kind?: string, expiresAt?: number | null): boolean;
   revokeCredential(profileId: string, token: string): void;
   revokeCredentials(profileId: string, kind: string): void;
@@ -385,15 +384,6 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
       .run(sha256(token), profileId, requireString(kind, "credential kind", 40), now(), expiresAt);
   };
 
-  const hasCredential = (profileId: string, token: string) => {
-    ensureOpen();
-    const tokenHash = sha256(token);
-    const primary = db.prepare("SELECT 1 FROM social_profiles WHERE id=? AND token_hash=?").get(profileId, tokenHash);
-    if (primary) return true;
-    return Boolean(db.prepare(`SELECT 1 FROM social_profile_credentials
-      WHERE profile_id=? AND token_hash=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)`).get(profileId, tokenHash, now()));
-  };
-
   const retirePrimaryCredential = (profileId: string, token: string, replacementHash: string, kind?: string, expiresAt?: number | null) => {
     ensureOpen();
     const currentHash = sha256(token);
@@ -649,7 +639,6 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     createProfile,
     authenticate,
     addCredential,
-    hasCredential,
     retirePrimaryCredential,
     revokeCredential,
     revokeCredentials,
