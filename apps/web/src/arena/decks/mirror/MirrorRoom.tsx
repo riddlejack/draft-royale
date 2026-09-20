@@ -3,7 +3,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Shuff
 import type { ArenaCard, ArenaCollection, DeckDefinition, MirrorPlaylistKey, MirrorRoomCommand, MirrorRoomCredential, MirrorRoomView } from "@draft-royale/shared";
 import { ArenaCardFace } from "../../components/ArenaCardFace";
 import { DeckEditor } from "../DeckEditor";
-import { clashDeckLink, createDeckId, deckElixirLabel } from "../deckUtils";
+import { clashDeckLink, createDeckId, deckElixirLabel, orderedDeckKeys } from "../deckUtils";
 import { commandMirrorRoom, createMirrorRoom, getMirrorRoom, joinMirrorRoom, mirrorCommandId, MirrorRoomApiError, readMirrorCredential, writeMirrorCredential } from "./mirrorClient";
 import "./mirror-room.css";
 
@@ -35,6 +35,7 @@ export function MirrorRoom({ catalog, collection, playerName, initialCode = "", 
   const [startingDeck, setStartingDeck] = useState<DeckDefinition | null>(null);
   const roomRef = useRef<MirrorRoomView | null>(null);
   const cardsByKey = useMemo(() => new Map(catalog.map((card) => [card.key, card])), [catalog]);
+  const displayedDeckKeys = room ? orderedDeckKeys(room.deck) : [];
   roomRef.current = room;
 
   useEffect(() => {
@@ -116,7 +117,7 @@ export function MirrorRoom({ catalog, collection, playerName, initialCode = "", 
     <nav className="mirror-playlists" aria-label="Deck playlists">{room.availablePlaylists.map((playlist) => <button key={playlist.id} disabled={!room.canEdit || pending || playlist.count === 0} title={playlist.count === 0 ? "No decks here yet. Build or import one instead." : undefined} className={playlist.id === room.playlist ? "is-active" : ""} onClick={() => void run(() => command({ action: "playlist", playlist: playlist.id }))}><strong>{playlist.label}</strong><span>{playlist.count} decks</span></button>)}</nav>
     <section className="mirror-current-deck">
       <header><div><span>{room.index < 0 ? "Custom shared deck" : room.playlist === "classics" ? "Classic deck" : "Community deck"}</span><h2>{room.deck.name}</h2><p>{room.deck.description ?? "Eight cards shared exactly with both players."}</p></div><b>{room.index >= 0 ? `${room.index + 1} / ${room.playlistCount}` : "Custom"}</b></header>
-      <div className="mirror-deck-grid">{room.deck.cards.map((key) => { const card = cardsByKey.get(key); const form = room.deck.forms?.[key] ?? "base"; return card ? <div key={key} title={card.forms.find((candidate) => candidate.key === form)?.label ?? card.name}><ArenaCardFace card={card} form={form} /><strong>{card.name}</strong></div> : null; })}</div>
+      <div className="mirror-deck-grid">{displayedDeckKeys.map((key) => { const card = cardsByKey.get(key); const form = room.deck.forms?.[key] ?? "base"; return card ? <div key={key} title={card.forms.find((candidate) => candidate.key === form)?.label ?? card.name}><ArenaCardFace card={card} form={form} /><strong>{card.name}</strong></div> : null; })}</div>
       <div className="mirror-deck-meta"><span>{deckElixirLabel(room.deck, catalog)}</span><details><summary>Deck details</summary><span>{room.deck.source.label}</span></details></div>
       {room.canEdit && <div className="mirror-control-deck"><button disabled={pending || !room.canGoPrevious} onClick={() => void run(() => command({ action: "previous" }))}><ChevronLeft size={19} /> Previous</button><button disabled={pending || !canBrowse} onClick={() => void run(() => command({ action: "shuffle" }))}><Shuffle size={18} /> Shuffle</button><button disabled={pending || !canBrowse} onClick={() => void run(() => command({ action: "next" }))}>Next <ChevronRight size={19} /></button></div>}
       {!room.canEdit && <p className="mirror-following">The host controls the playlist. This deck updates here for both players.</p>}
