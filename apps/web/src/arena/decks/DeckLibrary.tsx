@@ -105,7 +105,7 @@ export function DeckLibrary({ catalog, collection, onBack, onCopy, credential, o
 
   useEffect(() => {
     let disposed = false;
-    void libraryRequest<{ decks: DeckDefinition[] }>("/community").then((data) => { if (!disposed) setCommunity(data.decks); }).catch(() => {});
+    void libraryRequest<{ decks: DeckDefinition[] }>("/community", credential).then((data) => { if (!disposed) setCommunity(data.decks); }).catch(() => {});
     if (credential) void libraryRequest<{ decks: DeckDefinition[] }>("/mine", credential).then((data) => {
       if (!disposed) { const cached = readSavedDecks(credential.profileId).filter((deck) => !deck.id.startsWith("deck_")); const next = [...data.decks, ...cached]; setSavedDecks(next); writeSavedDecks(next, credential.profileId); }
     }).catch((failure: unknown) => { if (!disposed) setActionError(failure instanceof Error ? failure.message : "Saved decks could not sync."); });

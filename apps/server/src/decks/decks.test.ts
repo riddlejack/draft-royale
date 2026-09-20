@@ -25,6 +25,15 @@ describe("owned deck library", () => {
     service.remove("alice", published.id);
     expect(service.list()).toEqual([]);
   });
+  it("shares published decks only with the owners a viewer is allowed to see", () => {
+    const service = setup();
+    service.save("alice", "Alice", { commandId: "one", visibility: "public", deck: sample });
+    service.save("alice", "Alice", { commandId: "two", visibility: "private", deck: { ...sample, id: "local-private", name: "Secret" } });
+    service.save("carol", "Carol", { commandId: "one", visibility: "public", deck: { ...sample, name: "Carol's Hog" } });
+    expect(service.listPublishedBy(["bob", "alice"]).map((deck) => deck.name)).toEqual(["Hog 2.6"]);
+    expect(service.listPublishedBy(["bob"])).toEqual([]);
+    expect(service.listPublishedBy([])).toEqual([]);
+  });
   it("makes retries idempotent and rejects reused operation IDs", () => {
     const service = setup();
     const body = { commandId: "one", visibility: "public", deck: sample };

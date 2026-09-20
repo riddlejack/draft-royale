@@ -18,7 +18,11 @@ export function createDeckRouter(service: DeckService, social: SocialService, se
   const auth = (header?: string) => social.authenticate(header?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "");
   router.use("/api/decks", guard);
   router.get("/api/decks/seeds", (_request, response) => response.json(seeds()));
-  router.get("/api/decks/community", (_request, response) => response.json({ decks: service.list() }));
+  router.get("/api/decks/community", (request, response) => {
+    if (!request.header("authorization")) { response.json({ decks: [] }); return; }
+    const user = auth(request.header("authorization"));
+    response.json({ decks: service.listPublishedBy([user.profile.id, ...social.getState(user).friends.map((friend) => friend.id)]) });
+  });
   router.get("/api/decks/mine", (request, response) => response.json({ decks: service.list(auth(request.header("authorization")).profile.id) }));
   router.post("/api/decks", (request, response) => {
     const user = auth(request.header("authorization"));

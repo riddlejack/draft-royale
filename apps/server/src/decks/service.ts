@@ -62,6 +62,13 @@ export function createDeckService(options: { databasePath: string; catalog: read
     ? db.prepare("SELECT json FROM library_decks WHERE owner_id = ? ORDER BY updated_at DESC LIMIT 300").all(ownerId)
     : db.prepare("SELECT json FROM library_decks WHERE visibility = 'public' ORDER BY updated_at DESC LIMIT 500").all()
   ).map((row) => JSON.parse(row.json as string) as StoredDeck);
+  /** Published decks are shared with friends, never site-wide. */
+  const listPublishedBy = (ownerIds: readonly string[]): StoredDeck[] => {
+    const owners = [...new Set(ownerIds)].slice(0, 500);
+    if (owners.length === 0) return [];
+    return db.prepare(`SELECT json FROM library_decks WHERE visibility = 'public' AND owner_id IN (${owners.map(() => "?").join(",")}) ORDER BY updated_at DESC LIMIT 500`).all(...owners)
+      .map((row) => JSON.parse(row.json as string) as StoredDeck);
+  };
   const save = (ownerId: string, author: string, input: unknown): StoredDeck => {
     const body = record(input);
     const commandId = text(body.commandId, "Operation ID", 100);
@@ -94,6 +101,6 @@ export function createDeckService(options: { databasePath: string; catalog: read
     if (row.owner_id !== ownerId) throw new DeckError(403, "Only the author can remove this deck.");
     db.prepare("DELETE FROM library_decks WHERE id=? AND owner_id=?").run(id, ownerId);
   };
-  return { list, save, remove, close: () => db.close() };
+  return { list, listPublishedBy, save, remove, close: () => db.close() };
 }
 export type DeckService = ReturnType<typeof createDeckService>;
