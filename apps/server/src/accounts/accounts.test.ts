@@ -84,7 +84,8 @@ describe("remembered player accounts", () => {
     const app = createArenaApp({ catalog, catalogVersion: "test", databasePath });
     const accounts = app.locals.accountService as AccountService;
     expect(accounts.list()).toEqual([expect.objectContaining({ profileId, tag: "#P0LYQ" })]);
-    expect(() => accounts.login({ username: "Original", password: "old display password" })).toThrow(/one-time password migration/i);
+    expect(() => accounts.login({ username: "Original", password: "old display password" })).toThrow(/administrator reset/i);
+    expect(() => accounts.register({ displayName: "Original", password: "replacement durable password" })).toThrow(/already has an account/i);
     expect(accounts.register({ displayName: "AlsoTracking", tag: "#P0LYQ", password: "different durable password" }).account.tag).toBe("#P0LYQ");
     app.locals.arenaService.close();
 
@@ -134,7 +135,7 @@ describe("remembered player accounts", () => {
     app = createArenaApp(options);
     accounts = app.locals.accountService as AccountService;
     expect(accounts.list().map((account) => account.displayName)).toEqual(["LegacyPlayer", "TrustedFriend"]);
-    expect(() => accounts.login({ username: "LegacyPlayer", password: "temporary secure pass" })).toThrow(/one-time password migration/i);
+    expect(() => accounts.login({ username: "LegacyPlayer", password: "temporary secure pass" })).toThrow(/administrator reset/i);
     const oldBearer = { Authorization: `Bearer ${oldToken}` };
     await request(app).get("/api/accounts/session").set(oldBearer).expect(401);
     await request(app).get("/api/social/state").set(oldBearer).expect(401);
@@ -173,6 +174,68 @@ describe("remembered player accounts", () => {
     cleanup.push(() => app.locals.arenaService.close());
     expect((app.locals.accountService as AccountService).login({ username: "LegacyPlayer", password: migratedPassword }).credential.profileId).toBe(legacy.account.profileId);
     await request(app).get("/api/social/state").set(oldBearer).expect(401);
+  });
+
+  it("lets a reset account choose a new password without losing its profile, friends, decks, tag, or history", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "draft-reset-account-"));
+    cleanup.push(() => rmSync(dir, { recursive: true, force: true }));
+    const databasePath = path.join(dir, "test.sqlite");
+    const options = { catalog, catalogVersion: "test", databasePath };
+    let app = createArenaApp(options);
+    let accounts = app.locals.accountService as AccountService;
+    const reset = accounts.register({ displayName: "PlayerOne", tag: "#P0LYQ", password: "temporary secure pass" });
+    const friend = accounts.register({ displayName: "TrustedFriend", tag: "#28PYL", password: "another secure phrase" });
+    const resetBearer = { Authorization: `Bearer ${reset.credential.token}` };
+    const friendBearer = { Authorization: `Bearer ${friend.credential.token}` };
+    const link = await request(app).post("/api/social/friend-links").set(resetBearer).send({ commandId: "reset-link" }).expect(201);
+    await request(app).post("/api/social/friend-links/accept").set(friendBearer)
+      .send({ token: link.body.friendLink.token, commandId: "reset-friend-accept" }).expect(200);
+    await request(app).post("/api/decks").set(resetBearer).send({
+      commandId: "reset-deck", deck: { id: "reset-deck", name: "Still here", mode: "classic", cards: ["hog-rider", "musketeer", "ice-golem", "skeletons", "ice-spirit", "cannon", "fireball", "the-log"] },
+    }).expect(201);
+    await request(app).post("/api/tracker/manual").set(resetBearer).send({
+      commandId: "reset-history", battleTime: "2026-09-20T12:00:00Z", type: "friendly",
+      mode: { name: "Friendly" }, teamAProfileIds: [reset.account.profileId], teamBProfileIds: [friend.account.profileId],
+      winner: "a", crownsA: 1, crownsB: 0,
+    }).expect(201);
+    const collection = { cards: ["knight", "archers"], forms: { archers: ["base"] }, source: "manual" };
+    accounts.saveCollection(reset.account.profileId, collection);
+    app.locals.arenaService.close();
+
+    const database = new DatabaseSync(databasePath);
+    const resetCode = "DR-RESET-TEST-ONLY-CODE";
+    database.exec("BEGIN IMMEDIATE;");
+    database.prepare("UPDATE club_accounts SET salt=lower(hex(randomblob(16))),password_hash=lower(hex(randomblob(32))),password_version=-1,credential_version=credential_version+1,password_enabled=0 WHERE profile_id=?")
+      .run(reset.account.profileId);
+    database.prepare("DELETE FROM account_sessions WHERE profile_id=?").run(reset.account.profileId);
+    database.prepare("DELETE FROM account_recovery WHERE profile_id=?").run(reset.account.profileId);
+    database.prepare("DELETE FROM account_providers WHERE profile_id=?").run(reset.account.profileId);
+    database.prepare("DELETE FROM social_profile_credentials WHERE profile_id=?").run(reset.account.profileId);
+    database.prepare("UPDATE social_profiles SET token_hash=lower(hex(randomblob(32))) WHERE id=?").run(reset.account.profileId);
+    database.prepare("INSERT INTO account_reset_claims(profile_id,code_hash,created_at,consumed_at) VALUES(?,?,?,NULL)")
+      .run(reset.account.profileId, createHash("sha256").update(resetCode).digest("hex"), Date.now());
+    database.exec("COMMIT;");
+    database.close();
+
+    app = createArenaApp(options);
+    cleanup.push(() => app.locals.arenaService.close());
+    accounts = app.locals.accountService as AccountService;
+    expect(() => accounts.login({ username: "PlayerOne", password: "temporary secure pass" })).toThrow(/use Create account/i);
+    expect(() => accounts.register({ displayName: "PlayerOne", password: "replacement durable password" })).toThrow(/one-time reset code/i);
+    expect(() => accounts.register({ displayName: "PlayerOne", password: "replacement durable password", resetCode: "wrong code" })).toThrow(/one-time reset code/i);
+    const claimed = accounts.register({ displayName: "PlayerOne", tag: "#28PYL", password: "replacement durable password", resetCode });
+    expect(claimed.account).toMatchObject({ profileId: reset.account.profileId, tag: "#P0LYQ" });
+    expect(claimed.collection).toEqual(collection);
+    expect(claimed.recoveryCode).toMatch(/^DR-/);
+    const claimedBearer = { Authorization: `Bearer ${claimed.credential.token}` };
+    expect((await request(app).get("/api/social/state").set(claimedBearer).expect(200)).body.state.friends).toHaveLength(1);
+    expect((await request(app).get("/api/decks/mine").set(claimedBearer).expect(200)).body.decks).toEqual([expect.objectContaining({ name: "Still here" })]);
+    expect((await request(app).get("/api/tracker/summary").set(claimedBearer).expect(200)).body.summary.recentGames).toHaveLength(1);
+    await request(app).get("/api/accounts/session").set(resetBearer).expect(401);
+    await request(app).get("/api/social/state").set(resetBearer).expect(401);
+    await request(app).get("/api/decks/mine").set(resetBearer).expect(401);
+    await request(app).get("/api/tracker/summary").set(resetBearer).expect(401);
+    expect(() => accounts.register({ displayName: "PlayerOne", password: "another durable password", resetCode })).toThrow(/already has an account/i);
   });
 
   it("persists account-owned collections and uses one-time recovery to revoke every older session", async () => {

@@ -29,6 +29,7 @@ app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("Referrer-Policy", "no-referrer");
   response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   next();
 });
 app.use(arenaApp);

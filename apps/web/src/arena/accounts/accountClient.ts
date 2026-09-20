@@ -68,7 +68,9 @@ export const collectionDirtyKey = (profileId: string) => `collection-dirty:${pro
 export const getProviderConfig = () => accountRequest<ProviderConfig>("/providers");
 export const getAccountSession = (token: string) => accountRequest<AccountSession>("/session", { token });
 export const loginAccount = (username: string, password: string) => accountRequest<AccountSession>("/login", { body: { username, password } });
-export const registerAccount = (displayName: string, password: string) => accountRequest<AccountSession>("/register", { body: { displayName, password } });
+export const registerAccount = (displayName: string, password: string, resetCode?: string) => accountRequest<AccountSession>("/register", {
+  body: { displayName, password, ...(resetCode ? { resetCode } : {}) },
+});
 export const recoverAccount = (username: string, recoveryCode: string, newPassword: string) => accountRequest<AccountSession>("/recover", { body: { username, recoveryCode, newPassword } });
 export const rotateAccountRecovery = (token: string, password: string) => accountRequest<{ recoveryCode: string }>("/recovery/rotate", { body: { password }, token });
 export const logoutAccount = (token: string) => accountRequest<{ ok: true }>("/logout", { body: {}, token });

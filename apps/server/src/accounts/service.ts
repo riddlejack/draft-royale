@@ -156,6 +156,10 @@ export function createAccountService(options: AccountServiceOptions) {
       state_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL, consumed_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS account_google_challenges_expiry ON account_google_challenges(expires_at, consumed_at);
+    CREATE TABLE IF NOT EXISTS account_reset_claims (
+      profile_id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL, consumed_at INTEGER
+    );
   `);
   db.prepare("INSERT INTO club_account_meta(key,value) VALUES('account_schema_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
     .run(String(ACCOUNT_SCHEMA_VERSION));
@@ -239,10 +243,41 @@ export function createAccountService(options: AccountServiceOptions) {
   const ensureCapacity = () => {
     if (rows().length >= 100) throw new AccountError(409, "This friend group has reached 100 players.", "ACCOUNT_LIMIT");
   };
-  const addPasswordAccount = (displayName: string, password: string, tag: string | null) => {
-    ensureCapacity();
+  const addPasswordAccount = (displayName: string, password: string, tag: string | null, resetCode: unknown) => {
     const username = displayName.toLowerCase();
-    if (rowForUsername(username)) throw new AccountError(409, "That player name already has an account. Sign in instead.", "USERNAME_TAKEN");
+    const existing = rowForUsername(username);
+    if (existing) {
+      if (existing.password_version !== -1 || providersFor(existing.profile_id).length > 0) {
+        throw new AccountError(409, "That player name already has an account. Sign in instead.", "USERNAME_TAKEN");
+      }
+      const code = typeof resetCode === "string" && resetCode.length <= 100 ? resetCode.trim().toUpperCase() : "";
+      const salt = randomBytes(16).toString("hex");
+      const timestamp = now();
+      db.exec("BEGIN IMMEDIATE;");
+      try {
+        const claim = db.prepare("SELECT code_hash,consumed_at FROM account_reset_claims WHERE profile_id=?").get(existing.profile_id) as { code_hash: string; consumed_at: number | null } | undefined;
+        if (!claim || claim.consumed_at !== null || !sameHex(sha256(code || "invalid-reset-code"), claim.code_hash)) {
+          throw new AccountError(403, "Enter the one-time reset code for this account.", "ACCOUNT_CLAIM_REQUIRED");
+        }
+        db.prepare("DELETE FROM account_sessions WHERE profile_id=?").run(existing.profile_id);
+        db.prepare("DELETE FROM account_recovery WHERE profile_id=?").run(existing.profile_id);
+        db.prepare("DELETE FROM account_providers WHERE profile_id=?").run(existing.profile_id);
+        db.prepare("DELETE FROM social_profile_credentials WHERE profile_id=?").run(existing.profile_id);
+        db.prepare("UPDATE social_profiles SET display_name=?,token_hash=?,updated_at=? WHERE id=?")
+          .run(displayName, randomBytes(32).toString("hex"), timestamp, existing.profile_id);
+        const updated = db.prepare(`UPDATE club_accounts SET display_name=?,tag=?,salt=?,password_hash=?,password_version=1,
+          credential_version=credential_version+1,password_enabled=1 WHERE profile_id=? AND password_version=-1`)
+          .run(displayName, existing.tag, salt, scryptSync(password, salt, 32).toString("hex"), existing.profile_id);
+        if (updated.changes !== 1) throw new AccountError(409, "This account is no longer waiting to be reset.", "ACCOUNT_CLAIM_USED");
+        const consumed = db.prepare("UPDATE account_reset_claims SET consumed_at=? WHERE profile_id=? AND consumed_at IS NULL")
+          .run(timestamp, existing.profile_id);
+        if (consumed.changes !== 1) throw new AccountError(409, "That reset code was already used.", "ACCOUNT_CLAIM_USED");
+        db.exec("COMMIT;");
+      } catch (error) { db.exec("ROLLBACK;"); throw error; }
+      const claimed = rowForProfile(existing.profile_id)!;
+      return { ...issueSession(claimed), recoveryCode: createRecovery(claimed.profile_id) };
+    }
+    ensureCapacity();
     const salt = randomBytes(16).toString("hex");
     const profile = options.social.createProfile({ displayName });
     db.prepare(`INSERT INTO club_accounts(username,display_name,tag,salt,password_hash,profile_id,password_version,credential_version,password_enabled,created_at)
@@ -256,11 +291,14 @@ export function createAccountService(options: AccountServiceOptions) {
     const username = nameOf(body?.username).toLowerCase();
     const password = typeof body?.password === "string" && body.password.length <= 128 ? body.password : "";
     const row = rowForUsername(username);
+    if (row?.password_version === -1) {
+      throw new AccountError(409, "This account was reset. Use Create account to choose a new password.", "ACCOUNT_RECLAIM_REQUIRED");
+    }
+    if (row && row.password_version < 1) throw new AccountError(409, "This legacy account requires an administrator reset.", "LEGACY_PASSWORD_MIGRATION_REQUIRED");
     const hash = scryptSync(password, row?.salt || "invalid-account-salt", 32);
     const stored = Buffer.from(row?.password_hash || "00".repeat(32), "hex");
     if (!row || stored.length !== hash.length || !timingSafeEqual(hash, stored)) throw new AccountError(401, "The player name or password is incorrect.", "INVALID_CREDENTIALS");
     if (!row.password_enabled) throw new AccountError(409, "This account uses a connected sign-in provider.", "PASSWORD_NOT_ENABLED");
-    if (row.password_version < 1) throw new AccountError(409, "This private legacy account needs a one-time password migration before it can sign in.", "LEGACY_PASSWORD_MIGRATION_REQUIRED");
     const response = issueSession(row);
     const recovery = db.prepare("SELECT 1 FROM account_recovery WHERE profile_id=?").get(row.profile_id);
     return recovery ? response : { ...response, recoveryCode: createRecovery(row.profile_id) };
@@ -268,7 +306,7 @@ export function createAccountService(options: AccountServiceOptions) {
   const register = (input: unknown) => {
     const body = input as Record<string, unknown> | null;
     const displayName = nameOf(body?.displayName);
-    return addPasswordAccount(displayName, passwordOf(body?.password, displayName), tagOf(body?.tag));
+    return addPasswordAccount(displayName, passwordOf(body?.password, displayName), tagOf(body?.tag), body?.resetCode);
   };
   const forProfile = (profileId: string) => {
     const row = rowForProfile(profileId);

@@ -108,6 +108,8 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [claimRequired, setClaimRequired] = useState(false);
   const [tag, setTag] = useState(account?.tag ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -166,11 +168,15 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
     if ((mode === "register" || mode === "recover") && password !== passwordConfirm) { setError("Passwords do not match."); return; }
     setPending(true); setError(""); setNotice("");
     try {
-      const session = mode === "register" ? await registerAccount(username, password)
+      const session = mode === "register" ? await registerAccount(username, password, resetCode)
         : mode === "recover" ? await recoverAccount(username, recoveryCode, password)
           : await loginAccount(username, password);
       acceptSession(session, true);
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to sign in. Try again."); }
+    } catch (failure) {
+      const code = failure && typeof failure === "object" && "code" in failure ? failure.code : undefined;
+      if (code === "ACCOUNT_CLAIM_REQUIRED") setClaimRequired(true);
+      setError(failure instanceof Error ? failure.message : "Unable to sign in. Try again.");
+    }
     finally { setPending(false); }
   }
 
@@ -226,7 +232,7 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
   }
 
   const switchMode = (next: typeof mode) => {
-    setMode(next); setUsername(""); setPassword(""); setPasswordConfirm(""); setRecoveryCode(""); setError(""); setNotice("");
+    setMode(next); setUsername(""); setPassword(""); setPasswordConfirm(""); setRecoveryCode(""); setResetCode(""); setClaimRequired(false); setError(""); setNotice("");
   };
 
   return <>
@@ -250,7 +256,8 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
           <form onSubmit={(event) => { event.preventDefault(); void submitCredentials(); }}>
             <label>Player name<input value={username} maxLength={32} autoComplete="username" onChange={(event) => setUsername(event.target.value)} required /></label>
             {mode === "recover" ? <label>Recovery code<input value={recoveryCode} maxLength={40} autoComplete="off" onChange={(event) => setRecoveryCode(event.target.value.toUpperCase())} placeholder="DR-…" required /></label> : null}
-            <label>{mode === "recover" ? "New password" : "Password"}<input type="password" minLength={12} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder={mode === "login" ? "Password" : "12 characters or more"} required /></label>
+            {mode === "register" && claimRequired ? <label>One-time reset code<input value={resetCode} maxLength={100} autoComplete="off" onChange={(event) => setResetCode(event.target.value.toUpperCase())} placeholder="DR-RESET-…" required /></label> : null}
+            <label>{mode === "recover" ? "New password" : "Password"}<input type="password" minLength={mode === "login" ? undefined : 12} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} placeholder={mode === "login" ? "Password" : "12 characters or more"} required /></label>
             {mode !== "login" ? <label>Confirm password<input type="password" minLength={12} maxLength={128} value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} autoComplete="new-password" required /></label> : null}
             {error ? <p role="alert" className="club-account-error">{error}</p> : null}
             <button className="royale-button gold full-width" disabled={pending}>{pending ? "Connecting…" : mode === "register" ? "Create account" : mode === "recover" ? "Reset password & sign in" : "Sign in & remember device"}</button>
