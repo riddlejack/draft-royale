@@ -7,10 +7,10 @@ All responses use `Cache-Control: no-store`. Room credentials are opaque bearer 
 `POST /api/mirror/rooms`
 
 ```json
-{ "name": "Host", "playlist": "mirror" }
+{ "name": "Host", "playlist": "classics" }
 ```
 
-`playlist` is `mirror`, `classics`, or `community`; it defaults to `mirror`. An optional legal eight-card `deck` starts the room with a custom selection. A custom deck in the Mirror playlist must contain Mirror.
+`playlist` is `classics` or `community`; it defaults to `classics`. An optional legal eight-card `deck` starts the room with a custom selection. A same-deck room never requires the Mirror card.
 
 Response: `{ "credential": { "roomId", "seat": "a", "token" }, "room": MirrorRoomView }`.
 
@@ -44,8 +44,8 @@ Actions:
 
 - `next`, `previous`, or `shuffle`
 - `edit` plus a legal eight-card `deck`
-- `playlist` plus `playlist: "mirror" | "classics" | "community"`
+- `playlist` plus `playlist: "classics" | "community"`
 
 Only seat `a` can mutate the room. Response: `{ "room": MirrorRoomView }`.
 
-`next` and `shuffle` do not repeat a playlist candidate until that playlist is exhausted. `previous` and forward `next` traverse durable room history, including edits and source provenance. Generated Mirror remixes are explicitly labeled as community-generated and not Supercell's official Mirror deck pool.
+`next` and `shuffle` do not repeat a playlist candidate until that playlist is exhausted. `previous` and forward `next` traverse durable room history, including edits and source provenance. Existing room snapshots remain readable even if they reference an older, retired playlist.

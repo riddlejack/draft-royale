@@ -61,7 +61,7 @@
 .library-deck-footer { display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:9px;padding-top:8px;border-top:1px solid #79a3c240; }
 .library-elixir { display:flex;align-items:center;gap:4px;color:#f2d5ff;font-size:10px;font-weight:1000;white-space:nowrap; }
 .library-elixir i,.deck-slot-heading i { display:inline-block;width:10px;height:13px;border-radius:60% 40% 60% 40%;background:linear-gradient(#f58cff,#a900bd);transform:rotate(36deg);box-shadow:inset 1px 1px 0 #ffcaff; }
-.library-source { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8cabc2;font-size:9px;font-weight:800; }
+.library-source { min-width:0;color:#8cabc2;font-size:9px;font-weight:800; }.library-source summary { cursor:pointer;white-space:nowrap; }.library-source span,.library-source a { display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }.library-source a { color:#89cdf6; }
 .library-deck-actions { display:flex;gap:5px; }
 .library-deck-actions button,.library-deck-actions a { display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:30px;padding:5px 8px;border:1px solid #6c9cbc;border-radius:6px;background:#204b6b;color:#e6f1f8;font-size:9px;font-weight:1000;text-decoration:none; }
 .library-deck-actions a { border-color:#ffdd69;background:linear-gradient(#ffd957,#eca91f);color:#33210d; }

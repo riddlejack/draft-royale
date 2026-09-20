@@ -11,9 +11,10 @@ describe("Mirror room client", () => {
   it("uses the create and normalized join endpoints", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => response });
     vi.stubGlobal("fetch", fetchMock);
-    await createMirrorRoom("Host", "mirror");
+    await createMirrorRoom("Host");
     await joinMirrorRoom("Guest", " abcd12 ");
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/mirror/rooms");
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body)).toEqual({ name: "Host", playlist: "classics" });
     expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body)).toEqual({ name: "Guest", code: "ABCD12" });
   });
 

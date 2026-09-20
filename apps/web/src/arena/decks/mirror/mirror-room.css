@@ -1,7 +1,7 @@
 .mirror-room-entry,.mirror-room-screen { position:relative;z-index:1;width:min(100%,620px);min-height:100svh;margin:auto;padding:calc(14px + env(safe-area-inset-top,0px)) 18px calc(28px + env(safe-area-inset-bottom,0px));color:#fff9e9; }
 .mirror-room-entry { display:flex;flex-direction:column; }
 .mirror-entry-emblem { padding:35px 10px 24px;text-align:center; }
-.mirror-entry-emblem img { width:104px;height:138px;object-fit:contain;filter:drop-shadow(0 9px 6px #0008);transform:rotate(-4deg); }
+.mirror-entry-emblem svg { width:104px;height:104px;color:#85d2ff;filter:drop-shadow(0 9px 6px #0008); }
 .mirror-entry-emblem h2 { max-width:420px;margin:18px auto 0;font-family:var(--royale-heading);font-size:25px;line-height:1.25;text-shadow:0 3px 0 #07192a; }
 .mirror-entry-emblem p { max-width:450px;margin:9px auto 0;color:#b3cadc;font-size:11px;line-height:1.55; }
 .mirror-room-entry>label { display:block;color:#a9c3d6;font-size:10px;font-weight:1000;text-transform:uppercase; }
@@ -32,7 +32,7 @@
 .mirror-deck-grid>div { display:flex;min-width:0;flex-direction:column;align-items:center;gap:3px; }
 .mirror-deck-grid .arena-card-face { display:block;flex:0 0 auto;width:100%;height:auto;aspect-ratio:3/4;filter:drop-shadow(0 4px 3px #0007); }.mirror-deck-grid .arena-card-art { width:100%;height:100%;object-fit:contain; }.mirror-deck-grid .arena-elixir { transform:scale(.72);transform-origin:top left; }
 .mirror-deck-grid strong { flex:0 0 auto;width:100%;min-height:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;line-height:1.35;text-align:center; }
-.mirror-deck-meta { display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:9px;border-top:1px solid #72a0bf40;color:#a8c1d3;font-size:9px;font-weight:800; }
+.mirror-deck-meta { display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:9px;border-top:1px solid #72a0bf40;color:#a8c1d3;font-size:9px;font-weight:800; }.mirror-deck-meta details { margin-left:auto;color:#91b8d2; }.mirror-deck-meta summary { cursor:pointer; }.mirror-deck-meta details span { display:block;max-width:210px;margin-top:5px;white-space:normal;text-align:right; }
 .mirror-deck-meta span:first-child { color:#e6ccf7;font-weight:1000; }
 .mirror-control-deck { display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:11px; }
 .mirror-control-deck button { display:flex;align-items:center;justify-content:center;gap:4px;min-height:39px;padding:6px;border:1px solid #6999bb;border-radius:8px;background:#1e5277;color:#eaf4fa;font-size:9px;font-weight:1000; }
@@ -44,7 +44,7 @@
 .mirror-room-note { margin:11px 4px;color:#88a8bd;font-size:9px;line-height:1.45;text-align:center; }
 @media (min-width:700px) { .mirror-room-entry,.mirror-room-screen { min-height:min(880px,calc(100svh - 50px));margin-block:25px;border:1px solid #6484a536;border-radius:25px;background:#18365377;box-shadow:0 25px 100px #0005; } }
 @media (max-width:420px) {
-  .mirror-room-entry,.mirror-room-screen { padding-inline:12px; }.mirror-entry-emblem { padding-top:28px; }.mirror-entry-emblem img { width:90px;height:120px; }
+  .mirror-room-entry,.mirror-room-screen { padding-inline:12px; }.mirror-entry-emblem { padding-top:28px; }.mirror-entry-emblem svg { width:80px;height:80px; }
   .mirror-current-deck { padding:12px 9px; }.mirror-deck-grid { gap:5px; }.mirror-playlists strong { font-size:9px; }
   .mirror-deck-actions,.mirror-control-deck { gap:5px; }.mirror-deck-actions button,.mirror-deck-actions a,.mirror-control-deck button { font-size:8px; }
 }

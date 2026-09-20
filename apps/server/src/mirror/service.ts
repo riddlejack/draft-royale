@@ -13,15 +13,18 @@ import type {
 } from "@draft-royale/shared";
 import { DeckError, validateLibraryDeck } from "../decks/service.js";
 
-const playlistKeys: MirrorPlaylistKey[] = ["mirror", "classics", "community"];
+// `mirror` remains in the shared type so rooms created by earlier versions can
+// still be read. It is intentionally not an active source for new rooms: it
+// used to be populated by generated substitutions, not supplied deck recipes.
+const playlistKeys: MirrorPlaylistKey[] = ["classics", "community"];
 const playlistLabels: Record<MirrorPlaylistKey, string> = {
-  mirror: "Mirror remixes",
+  mirror: "Legacy Mirror selection",
   classics: "Classic decks",
   community: "Community decks",
 };
 const playlistDescriptions: Record<MirrorPlaylistKey, string> = {
-  mirror: "Generated Mirror remixes from legal library decks; these are not Supercell's official Mirror pool.",
-  classics: "Familiar historical decks, unchanged for identical-deck battles.",
+  mirror: "A saved selection from an earlier version of the app.",
+  classics: "Familiar decks available for a same-deck battle.",
   community: "Public decks shared by players.",
 };
 const maxPlaylistCandidates = 500;
@@ -92,7 +95,7 @@ const text = (value: unknown, label: string, max: number) => {
 };
 const playlistFrom = (value: unknown, fallback?: MirrorPlaylistKey): MirrorPlaylistKey => {
   const candidate = value ?? fallback;
-  if (!playlistKeys.includes(candidate as MirrorPlaylistKey)) throw new MirrorRoomError(400, "Choose mirror, classics, or community.", "INVALID_PLAYLIST");
+  if (!playlistKeys.includes(candidate as MirrorPlaylistKey)) throw new MirrorRoomError(400, "Choose classics or community.", "INVALID_PLAYLIST");
   return candidate as MirrorPlaylistKey;
 };
 const normalizeCode = (value: unknown) => text(value, "Invite code", 16).replace(/[\s-]/g, "").toUpperCase();
@@ -120,54 +123,8 @@ const uniqueCandidates = (candidates: Candidate[]) => {
   }).slice(0, maxPlaylistCandidates);
 };
 
-/** Deterministic, provenance-preserving variants. They are explicitly not represented as Supercell's official Mirror pool. */
-export const buildMirrorRemixCandidates = (decks: readonly DeckDefinition[], catalog: readonly ArenaCard[]): Candidate[] => {
-  const cardsByKey = new Map(catalog.map((card) => [card.key, card]));
-  const candidates: Candidate[] = [];
-  for (const sourceDeck of decks) {
-    if (candidates.length >= maxPlaylistCandidates) break;
-    if (sourceDeck.mode === "chaos") continue;
-    const source = validatedSourceDeck(sourceDeck, catalog);
-    if (!source) continue;
-    const stableSourceId = sourceDeckId(source);
-    if (source.cards.includes("mirror")) {
-      const valid = validatedSourceDeck({ ...source, mode: "mirror" }, catalog, "mirror");
-      if (valid) candidates.push({ id: `mirror:${stableSourceId}:original`, deck: valid });
-      continue;
-    }
-    for (let index = 0; index < source.cards.length && candidates.length < maxPlaylistCandidates; index += 1) {
-      const replacedKey = source.cards[index] as string;
-      const cards = source.cards.map((key, cardIndex) => cardIndex === index ? "mirror" : key);
-      if (new Set(cards).size !== 8) continue;
-      const forms = { ...(source.forms ?? {}) };
-      delete forms[replacedKey];
-      forms.mirror = "base";
-      const replacementName = cardsByKey.get(replacedKey)?.name ?? replacedKey;
-      const generated: DeckDefinition = {
-        ...source,
-        id: `mirror-remix-${stableSourceId}-${replacedKey}`.slice(0, 100),
-        name: `${source.name} · Mirror for ${replacementName}`.slice(0, 80),
-        mode: "mirror",
-        cards,
-        forms,
-        description: `Generated from ${source.name} by replacing ${replacementName} with Mirror. This is a community remix, not an official Clash Royale Mirror-pool deck.`,
-        tags: Array.from(new Set([...(source.tags ?? []), "generated-mirror", "not-official-pool"])).slice(0, 10),
-        source: {
-          ...source.source,
-          kind: "local",
-          label: `Generated Mirror remix · not official · ${source.source.label}`,
-          sourceId: source.id || source.source.sourceId,
-        },
-      };
-      const valid = validatedSourceDeck(generated, catalog, "mirror");
-      if (valid) candidates.push({ id: `mirror:${stableSourceId}:${replacedKey}`, deck: valid });
-    }
-  }
-  return uniqueCandidates(candidates);
-};
-
 const buildCandidates = (playlist: MirrorPlaylistKey, decks: readonly DeckDefinition[], catalog: readonly ArenaCard[]): Candidate[] => {
-  if (playlist === "mirror") return buildMirrorRemixCandidates(decks, catalog);
+  if (playlist === "mirror") return [];
   const matching = decks.filter((deck) => playlist === "classics"
     ? deck.mode === "classic" && deck.source.kind !== "community"
     : deck.source.kind === "community" || Boolean(deck.ownerId || deck.author));
@@ -307,8 +264,8 @@ export const createMirrorRoomService = (options: MirrorRoomServiceOptions): Mirr
   const validateCustom = (input: unknown, playlist: MirrorPlaylistKey, source?: DeckDefinition["source"]): DeckDefinition => {
     const body = record(input);
     try {
-      const valid = validateLibraryDeck({ ...body, mode: playlist === "mirror" ? "mirror" : "custom" }, options.catalog);
-      const sourceLabel = source?.label.replace(/^Custom remix of /, "");
+      const valid = validateLibraryDeck({ ...body, mode: "custom" }, options.catalog);
+      const sourceLabel = source?.label.replace(/^Custom room deck based on /, "");
       const submittedId = typeof body.id === "string" && body.id.trim() ? body.id.trim().slice(0, 100) : null;
       const id = source
         ? source.kind === "local" && submittedId?.startsWith("mirror-room-deck-") ? submittedId : `mirror-room-deck-${randomUUID()}`
@@ -317,7 +274,7 @@ export const createMirrorRoomService = (options: MirrorRoomServiceOptions): Mirr
         ...valid,
         id,
         source: source
-          ? { kind: "local", label: `Custom remix of ${sourceLabel}`.slice(0, 160), ...(source.sourceId ? { sourceId: source.sourceId } : {}) }
+          ? { kind: "local", label: `Custom room deck based on ${sourceLabel}`.slice(0, 160), ...(source.sourceId ? { sourceId: source.sourceId } : {}) }
           : { kind: "local", label: "Custom synchronized room deck" },
       };
     } catch (error) {
@@ -328,7 +285,7 @@ export const createMirrorRoomService = (options: MirrorRoomServiceOptions): Mirr
 
   const create = (input: { name: unknown; playlist?: unknown; deck?: unknown }): MirrorRoomSessionResponse => {
     const hostName = text(input.name, "Name", 32);
-    const playlist = playlistFrom(input.playlist, "mirror");
+    const playlist = playlistFrom(input.playlist, "classics");
     const timestamp = now();
     const provisional = {
       seenCandidateIds: { mirror: [], classics: [], community: [] },

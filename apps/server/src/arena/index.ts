@@ -10,7 +10,7 @@ import { createDeckRouter } from "../decks/router.js";
 import { createAccountService, type GoogleClaims } from "../accounts/service.js";
 import { createAccountRouter } from "../accounts/router.js";
 import type { DeckDefinition, DeckCollection } from "@draft-royale/shared";
-import { createMirrorRoomService, buildMirrorRemixCandidates } from "../mirror/service.js";
+import { createMirrorRoomService } from "../mirror/service.js";
 import { createMirrorRoomRouter } from "../mirror/router.js";
 import { createTrackerService } from "../tracker/service.js";
 import { createTrackerRouter } from "../tracker/router.js";
@@ -48,7 +48,7 @@ export const createArenaApp = (options: ArenaAppOptions): Express => {
     return data.collections ?? [];
   }) });
   const allLibraryDecks = (): DeckDefinition[] => [...deckSeeds().collections.flatMap((collection) => collection.decks ?? []), ...deckService.list()];
-  const librarySeeds = () => { const seeds = deckSeeds(); return { ...seeds, collections: [...seeds.collections, { id: "mirror-remixes", title: "Mirror remixes", mode: "mirror", description: "Every deck contains Mirror. Generated from library recipes; these are custom remixes, not Supercell’s official event pool.", decks: buildMirrorRemixCandidates(allLibraryDecks(), options.catalog).map((candidate) => candidate.deck) }] }; };
+  const librarySeeds = () => deckSeeds();
   const mirrorRoomService = createMirrorRoomService({ catalog: options.catalog, databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"), getDecks: allLibraryDecks });
   const trackerService = createTrackerService({
     databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"),

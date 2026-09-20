@@ -56,7 +56,9 @@ export function orderedDeckKeys(deck: Pick<DeckDefinition, "cards" | "forms">) {
 
 export function clashDeckLink(deck: Pick<DeckDefinition, "cards" | "forms">, cardsByKey: ReadonlyMap<string, ArenaCard>) {
   if (deck.cards.length !== 8) return "";
-  const ids = orderedDeckKeys(deck).map((key) => cardsByKey.get(key)?.id);
+  // The shared deck order is part of the room contract. Composition signatures
+  // may sort for deduplication, but an export must never silently reshuffle it.
+  const ids = deck.cards.map((key) => cardsByKey.get(key)?.id);
   if (ids.some((id) => id === undefined)) return "";
   try { return buildClashRoyaleDeckLink(ids as number[]); }
   catch { return ""; }

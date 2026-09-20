@@ -6,7 +6,7 @@ import type { ArenaCard, DeckDefinition, MirrorRoomView } from "@draft-royale/sh
 import express from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildMirrorRemixCandidates, createMirrorRoomRouter, createMirrorRoomService, type MirrorRoomService } from "./index.js";
+import { createMirrorRoomRouter, createMirrorRoomService, type MirrorRoomService } from "./index.js";
 
 const catalog: ArenaCard[] = [
   {
@@ -62,50 +62,11 @@ afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
-describe("Mirror remix candidates", () => {
-  it("generates bounded legal variants, preserves source locators, and labels them as unofficial", () => {
-    const variants = buildMirrorRemixCandidates(decks, catalog);
-    const compositions = variants.map(({ deck: candidate }) => JSON.stringify([...candidate.cards].sort().map((key) => [key, candidate.forms?.[key] ?? "base"])));
-    expect(variants).toHaveLength(23);
-    expect(new Set(compositions)).toHaveLength(variants.length);
-    expect(variants.every(({ deck: candidate }) => candidate.cards.length === 8 && new Set(candidate.cards).size === 8 && candidate.cards.includes("mirror"))).toBe(true);
-    expect(variants.every(({ deck: candidate }) => candidate.mode === "mirror" && candidate.source.label.includes("not official"))).toBe(true);
-    expect(variants.some(({ deck: candidate }) => candidate.source.url === "https://example.test/classic-one")).toBe(true);
-    expect(variants.some(({ deck: candidate }) => candidate.source.label.includes("Chaos source"))).toBe(false);
-  });
-
-  it("deduplicates equivalent rosters across card order, form order, and implicit base forms", () => {
-    const cards = Array.from({ length: 8 }, (_, index) => `card-${index + 1}`);
-    const implicit = deck("implicit", "Implicit base", 1, "classic", { kind: "local", label: "Implicit" });
-    const reversedCards = [...cards].reverse();
-    const explicitReversed: DeckDefinition = {
-      ...implicit,
-      id: "explicit-reversed",
-      name: "Explicit reversed",
-      cards: reversedCards,
-      forms: Object.fromEntries(reversedCards.map((key) => [key, "base"])),
-    };
-    const explicitPermuted: DeckDefinition = {
-      ...implicit,
-      id: "explicit-permuted",
-      name: "Explicit permuted",
-      forms: Object.fromEntries([cards[3], cards[1], cards[7], cards[0], cards[6], cards[2], cards[5], cards[4]].map((key) => [key, "base"])),
-    };
-
-    const variants = buildMirrorRemixCandidates([implicit, explicitReversed, explicitPermuted], catalog);
-    const compositions = variants.map(({ deck: candidate }) =>
-      JSON.stringify([...candidate.cards].sort().map((key) => [key, candidate.forms?.[key] ?? "base"])),
-    );
-    expect(variants).toHaveLength(8);
-    expect(new Set(compositions)).toHaveLength(8);
-  });
-});
-
 describe("synchronized Mirror room service", () => {
   it("gives both authenticated seats the identical deck without leaking either token", () => {
     const databasePath = createDatabase();
     const mirror = service(databasePath);
-    const host = mirror.create({ name: "Host", playlist: "mirror" });
+    const host = mirror.create({ name: "Host" });
     const guest = mirror.join({ code: host.room.code.toLowerCase(), name: "Guest" });
     const hostView = mirror.get(host.room.id, host.credential.token);
     const guestView = mirror.get(host.room.id, guest.credential.token);
@@ -156,7 +117,7 @@ describe("synchronized Mirror room service", () => {
     expect(edited.deck.name).toBe("Our version");
     expect(edited.deck.id).toMatch(/^mirror-room-deck-/);
     expect(edited.deck.id).not.toBe(session.room.deck.id);
-    expect(edited.deck.source).toEqual({ kind: "local", label: `Custom remix of ${originalSource.label}` });
+    expect(edited.deck.source).toEqual({ kind: "local", label: `Custom room deck based on ${originalSource.label}` });
     expect(edited.deck.source.url).toBeUndefined();
     expect(edited.deck.source.confidence).toBeUndefined();
     const advanced = mirror.command(session.room.id, session.credential.token, next(edited, "next-after-edit"));
@@ -171,19 +132,25 @@ describe("synchronized Mirror room service", () => {
       action: "edit", expectedRevision: restored.revision, commandId: "edit-2", deck: restored.deck,
     });
     expect(editedAgain.deck.id).toBe(restored.deck.id);
-    expect(editedAgain.deck.source.label).toBe(`Custom remix of ${originalSource.label}`);
+    expect(editedAgain.deck.source.label).toBe(`Custom room deck based on ${originalSource.label}`);
   });
 
-  it("enforces Mirror on Mirror edits while other playlists accept any legal eight-card deck", () => {
+  it("accepts any legal eight-card deck in a same-deck room, including one without Mirror", () => {
     const mirror = service();
-    const mirrorRoom = mirror.create({ name: "Host", playlist: "mirror" });
-    expect(() => mirror.command(mirrorRoom.room.id, mirrorRoom.credential.token, {
-      action: "edit", expectedRevision: mirrorRoom.room.revision, commandId: "bad-mirror-edit",
+    const sameDeckRoom = mirror.create({ name: "Host" });
+    const updated = mirror.command(sameDeckRoom.room.id, sameDeckRoom.credential.token, {
+      action: "edit", expectedRevision: sameDeckRoom.room.revision, commandId: "no-mirror-edit",
       deck: deck("bad", "No Mirror", 1, "custom", { kind: "local", label: "Test" }),
-    })).toThrowError(/must contain the Mirror card/i);
+    });
+    expect(updated.deck.cards).not.toContain("mirror");
+    expect(updated.deck.cards).toEqual(["card-1", "card-2", "card-3", "card-4", "card-5", "card-6", "card-7", "card-8"]);
+  });
 
-    const classicRoom = mirror.create({ name: "Host", playlist: "classics", deck: deck("custom", "Custom", 3, "custom", { kind: "local", label: "Test" }) });
-    expect(classicRoom.room.deck.cards).not.toContain("mirror");
+  it("does not expose a generated Mirror playlist while preserving legacy room snapshots", () => {
+    const mirror = service();
+    const room = mirror.create({ name: "Host" });
+    expect(room.room.availablePlaylists.map((playlist) => playlist.id)).toEqual(["classics", "community"]);
+    expect(() => mirror.create({ name: "Host", playlist: "mirror" })).toThrowError(/classics or community/i);
   });
 
   it("persists synchronized history and credentials across a service restart", () => {
