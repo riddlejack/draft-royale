@@ -854,11 +854,6 @@ const normalMirrorOffers = (room: InternalRoom, shuffled: readonly string[], off
   return mirrorOffersCanComplete(room, room.decks.a, offers) ? offers : null;
 };
 
-const pickOrderFor = (mode: ArenaMode): ArenaSeat[] => {
-  if (mode === "mega") return [...megaPickOrder];
-  return [];
-};
-
 const megaPickOrderFor = (starter: ArenaSeat): ArenaSeat[] =>
   megaPickOrder.map((canonicalSeat) => canonicalSeat === "a" ? starter : otherSeat(starter));
 

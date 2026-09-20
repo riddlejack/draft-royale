@@ -34,6 +34,7 @@ type ArenaSocialBridge = ArenaService & {
     settings: ArenaSettings;
     host: { name: string; collection: ArenaCollection; tokenHash: string };
     guest: { name: string; collection: ArenaCollection; tokenHash: string };
+    pairKey?: string;
   }): { roomId: string; hostRoom: ArenaView; guestRoom: ArenaView };
 };
 
@@ -526,6 +527,7 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     const guestToken = deriveSocialRoomToken(auth.token, row.id, "b");
     const room = options.arena.createInvitedRoom({
       operationId: row.id,
+      pairKey: sha256(JSON.stringify(canonicalFriendIds(row.sender_id, row.recipient_id))),
       settings,
       host: { name: row.sender_name, collection: senderCollection, tokenHash: row.sender_room_token_hash },
       guest: { name: row.recipient_name, collection, tokenHash: sha256(guestToken) },

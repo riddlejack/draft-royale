@@ -171,6 +171,9 @@ describe("battle invitations", () => {
     ]);
     expect(JSON.stringify(hashes)).not.toContain(hostRoomToken);
     expect(JSON.stringify(hashes)).not.toContain(accepted.body.session.credential.token);
+    const roomState = JSON.parse((credentialInspection.prepare("SELECT state_json FROM arena_rooms WHERE id = ?").get(accepted.body.session.credential.roomId) as { state_json: string }).state_json) as { megaPairKey?: string };
+    const canonicalProfileIds = [host.credential.profileId, guest.credential.profileId].sort();
+    expect(roomState.megaPairKey).toBe(createHash("sha256").update(JSON.stringify(canonicalProfileIds)).digest("hex"));
     credentialInspection.close();
 
     const acceptedReplay = await request(app).post(`/api/social/invites/${inviteId}/accept`).set(bearer(guest.credential.token))

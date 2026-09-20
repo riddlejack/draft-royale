@@ -902,7 +902,11 @@ async function runLateAcknowledgementFault(browser) {
   try {
     await Promise.all([openFreshHome(host), openFreshHome(guest)]);
     const oldRoom = await setupTwoPhoneRoom(host, guest, "mega");
-    await waitForInteractiveBoard(host, 36);
+    const openingView = await currentView(oldRoom.hostCredential);
+    assert(openingView.phase === "drafting" && openingView.activeSeat, "Late-ack room did not assign a Mega starter");
+    const actor = openingView.activeSeat === "a" ? host : guest;
+    const actorCredential = openingView.activeSeat === "a" ? oldRoom.hostCredential : oldRoom.guestCredential;
+    await waitForInteractiveBoard(actor, 36);
     const pathname = `/api/arena/rooms/${oldRoom.roomId}/pick`;
     const predicate = (url) => url.origin === new URL(baseUrl).origin && url.pathname === pathname;
     const handler = async (route, request) => {
@@ -912,23 +916,23 @@ async function runLateAcknowledgementFault(browser) {
       await responseRelease;
       await route.fulfill({ response: upstream });
     };
-    await host.context.route(predicate, handler);
-    await triggerPickWithoutWaiting(host);
+    await actor.context.route(predicate, handler);
+    await triggerPickWithoutWaiting(actor);
     await Promise.race([committed, sleep(6_000).then(() => { throw new Error("Delayed pick was not committed upstream"); })]);
-    await host.page.getByRole("button", { name: "Leave draft" }).click();
-    await waitForHome(host);
-    const newRoom = await createRoomThroughUi(host, "mega");
-    const newCredential = await savedCredential(host, newRoom.roomId);
+    await actor.page.getByRole("button", { name: "Leave draft" }).click();
+    await waitForHome(actor);
+    const newRoom = await createRoomThroughUi(actor, "mega");
+    const newCredential = await savedCredential(actor, newRoom.roomId);
     releaseResponse();
     await sleep(750);
-    assert(new URL(host.page.url()).hash === `#room=${encodeURIComponent(newRoom.roomId)}`, "Late pick response replaced the new room URL");
-    await host.page.getByRole("heading", { name: "Battle room" }).waitFor();
-    const [oldView, newView] = await Promise.all([currentView(oldRoom.hostCredential), currentView(newCredential)]);
+    assert(new URL(actor.page.url()).hash === `#room=${encodeURIComponent(newRoom.roomId)}`, "Late pick response replaced the new room URL");
+    await actor.page.getByRole("heading", { name: "Battle room" }).waitFor();
+    const [oldView, newView] = await Promise.all([currentView(actorCredential), currentView(newCredential)]);
     assert(oldView.events.length === 1, `Committed old-room pick produced ${oldView.events.length} events`);
     assert(newView.id === newRoom.roomId && newView.phase === "waiting" && newView.events.length === 0,
       "Late old-room response corrupted or replaced the new room");
-    await host.context.unroute(predicate, handler);
-    await screenshot(host, "fault-late-pick-ack-new-room-stable");
+    await actor.context.unroute(predicate, handler);
+    await screenshot(actor, "fault-late-pick-ack-new-room-stable");
     assertPhoneClean(host);
     assertPhoneClean(guest);
     return { committedOldRoomEvents: oldView.events.length, newRoomEvents: newView.events.length, newRoomRemainedActive: true };
@@ -951,7 +955,13 @@ async function runCommandRetryAndTimerFault(browser) {
   try {
     await Promise.all([openFreshHome(host), openFreshHome(guest)]);
     const room = await setupTwoPhoneRoom(host, guest, "mega");
-    await waitForInteractiveBoard(host, 36);
+    const openingView = await currentView(room.hostCredential);
+    assert(openingView.phase === "drafting" && openingView.activeSeat, "Fault room did not assign a Mega starter");
+    const starterSeat = openingView.activeSeat;
+    const starterPhone = starterSeat === "a" ? host : guest;
+    const opponentPhone = starterPhone === host ? guest : host;
+    const starterCredential = starterSeat === "a" ? room.hostCredential : room.guestCredential;
+    await waitForInteractiveBoard(starterPhone, 36);
     const pickPathname = `/api/arena/rooms/${room.roomId}/pick`;
     const pickPredicate = (url) => url.origin === new URL(baseUrl).origin && url.pathname === pickPathname;
     let resolveRetry;
@@ -963,28 +973,28 @@ async function runCommandRetryAndTimerFault(browser) {
       if (commandBodies.length === 1) {
         const upstream = await route.fetch();
         firstCommittedStatus = upstream.status();
-        host.collector.ignoreNetworkFailuresUntil = Date.now() + 5_000;
-        host.collector.expectedNetworkConsoleErrors.push("ERR_CONNECTION_RESET");
+        starterPhone.collector.ignoreNetworkFailuresUntil = Date.now() + 5_000;
+        starterPhone.collector.expectedNetworkConsoleErrors.push("ERR_CONNECTION_RESET");
         await route.abort("connectionreset");
         return;
       }
       resolveRetry();
       await route.continue();
     };
-    await host.context.route(pickPredicate, pickHandler);
-    await triggerPickWithoutWaiting(host);
+    await starterPhone.context.route(pickPredicate, pickHandler);
+    await triggerPickWithoutWaiting(starterPhone);
     await Promise.race([retrySeen, sleep(8_000).then(() => { throw new Error("Client did not retry the lost committed pick response"); })]);
-    await waitUntil(async () => (await currentView(room.hostCredential)).events.length === 1,
+    await waitUntil(async () => (await currentView(starterCredential)).events.length === 1,
       "Retried committed pick did not settle to one server event", 8_000);
     await sleep(350);
     assert(commandBodies.length === 2, `Lost response generated ${commandBodies.length} pick attempts instead of exactly two`);
     assert(firstCommittedStatus === 200, `First upstream pick did not commit successfully (${firstCommittedStatus})`);
     assert(commandBodies[0]?.commandId && commandBodies[0].commandId === commandBodies[1]?.commandId,
       "Lost-response retry generated a different commandId");
-    const afterRetry = await currentView(room.hostCredential);
-    assert(afterRetry.events.length === 1 && afterRetry.participants.find((participant) => participant.seat === "a")?.deckCount === 1,
+    const afterRetry = await currentView(starterCredential);
+    assert(afterRetry.events.length === 1 && afterRetry.participants.find((participant) => participant.seat === starterSeat)?.deckCount === 1,
       "Idempotent retry duplicated a pick or deck entry");
-    await host.context.unroute(pickPredicate, pickHandler);
+    await starterPhone.context.unroute(pickPredicate, pickHandler);
 
     const eventPathname = `/api/arena/rooms/${room.roomId}/events`;
     const statePathname = `/api/arena/rooms/${room.roomId}`;
@@ -1002,28 +1012,28 @@ async function runCommandRetryAndTimerFault(browser) {
       await sleep(2_000);
       await route.fulfill({ response: upstream, contentType: "application/json", body: JSON.stringify(body) });
       const fulfilledAt = Date.now();
-      if (!timingSample && body.events?.length >= 3 && body.activeSeat === "a") {
+      if (!timingSample && body.events?.length >= 3 && body.activeSeat === starterSeat) {
         timingSample = { requestedAt, fulfilledAt, serverNow: body.serverNow, deadlineAt: body.deadlineAt, pickSeconds: body.settings.pickSeconds };
         resolveTiming();
       }
     };
-    await host.context.route(eventPredicate, abortEvents);
-    await host.context.route(statePredicate, delayedState);
-    host.collector.ignoreNetworkFailuresUntil = Date.now() + 6_000;
-    await host.page.reload({ waitUntil: "domcontentloaded" });
-    await host.page.locator(".draft-stage").waitFor({ state: "visible", timeout: 8_000 });
-    await performUiPick(guest);
-    await guest.page.waitForFunction(() => document.querySelectorAll(".arena-cell.is-picked").length >= 2, null, { timeout: 5_000 });
-    await performUiPick(guest);
+    await starterPhone.context.route(eventPredicate, abortEvents);
+    await starterPhone.context.route(statePredicate, delayedState);
+    starterPhone.collector.ignoreNetworkFailuresUntil = Date.now() + 6_000;
+    await starterPhone.page.reload({ waitUntil: "domcontentloaded" });
+    await starterPhone.page.locator(".draft-stage").waitFor({ state: "visible", timeout: 8_000 });
+    await performUiPick(opponentPhone);
+    await opponentPhone.page.waitForFunction(() => document.querySelectorAll(".arena-cell.is-picked").length >= 2, null, { timeout: 5_000 });
+    await performUiPick(opponentPhone);
     await Promise.race([timingDelivered, sleep(10_000).then(() => { throw new Error("No delayed post-pick room-state response reached the timer client"); })]);
-    await host.page.locator(".draft-stage.is-local-turn .arena-timer.is-running").waitFor({ state: "visible", timeout: 5_000 });
-    const measurement = await host.page.evaluate(() => {
+    await starterPhone.page.locator(".draft-stage.is-local-turn .arena-timer.is-running").waitFor({ state: "visible", timeout: 5_000 });
+    const measurement = await starterPhone.page.evaluate(() => {
       const timer = document.querySelector(".arena-timer-fill");
       const transform = timer?.getAttribute("style")?.match(/scaleX\(([-\d.]+)\)/)?.[1];
       return { measuredAt: Date.now(), ratio: transform === undefined ? null : Number(transform) };
     });
     assert(measurement.ratio !== null && measurement.ratio >= 0 && measurement.ratio <= 1, "Timer fill did not expose a valid remaining-time ratio");
-    const live = await currentView(room.hostCredential);
+    const live = await currentView(starterCredential);
     const rttMs = timingSample.fulfilledAt - timingSample.requestedAt;
     const displayedRemainingMs = measurement.ratio * timingSample.pickSeconds * 1_000;
     const actualRemainingMs = Math.max(0, live.deadlineAt - live.serverNow);
@@ -1035,9 +1045,9 @@ async function runCommandRetryAndTimerFault(browser) {
       `Timer failed to correct a delayed room response: RTT ${rttMs}ms, correction ${Math.round(correctionMs)}ms`);
     assert(overclaimMs < 1_600,
       `Timer claimed ${Math.round(overclaimMs)}ms beyond the live server deadline after a ${rttMs}ms room-state RTT`);
-    await screenshot(host, "fault-room-state-rtt-calibrated");
-    await host.context.unroute(eventPredicate, abortEvents);
-    await host.context.unroute(statePredicate, delayedState);
+    await screenshot(starterPhone, "fault-room-state-rtt-calibrated");
+    await starterPhone.context.unroute(eventPredicate, abortEvents);
+    await starterPhone.context.unroute(statePredicate, delayedState);
     assertPhoneClean(host);
     assertPhoneClean(guest);
     return {
@@ -1079,7 +1089,11 @@ async function runMega(host, guest) {
     proveAssetHandshake: true,
     proveFailure: true,
   });
-  await Promise.all([waitForInteractiveBoard(host, 36), waitForInteractiveBoard(guest, 36, { requireEnabled: false })]);
+  const openingView = await currentView(room.hostCredential);
+  assert(openingView.phase === "drafting" && openingView.activeSeat, "Mega did not assign an opening seat after loading");
+  const openingPhone = openingView.activeSeat === "a" ? host : guest;
+  const waitingPhone = openingPhone === host ? guest : host;
+  await Promise.all([waitForInteractiveBoard(openingPhone, 36), waitForInteractiveBoard(waitingPhone, 36, { requireEnabled: false })]);
   const initialPositions = await megaPositions(host);
   assert(initialPositions.length === 36, `Mega rendered ${initialPositions.length} positions instead of 36`);
   assert(JSON.stringify(initialPositions) === JSON.stringify(await megaPositions(guest)), "Mega phones did not receive the same initial fixed board");
@@ -1096,13 +1110,14 @@ async function runMega(host, guest) {
     host.page.setViewportSize(phoneProfiles.iphone16.viewport),
     guest.page.setViewportSize(phoneProfiles.proMax16.viewport),
   ]);
-  await exerciseFailedPickUi(host, room.roomId);
+  await exerciseFailedPickUi(openingPhone, room.roomId);
 
   const picks = [];
   let chooserCount = 0;
   let specialFormCount = 0;
   let completionPresentation = null;
   let fallbackProof = null;
+  let fallbackPhone = null;
   let removePinnedPolling = [];
   let polledPickCount = 0;
   for (let index = 0; index < 16; index += 1) {
@@ -1110,8 +1125,8 @@ async function runMega(host, guest) {
     assert(hostView.phase === "drafting" && hostView.activeSeat, `Mega ended before pick ${index + 1}`);
     const phone = hostView.activeSeat === "a" ? host : guest;
     if (index === 0 && transport === "sse") {
-      assert(phone === host, "Mega first picker changed; polling fallback proof expects the host to submit while guest SSE is interrupted");
-      fallbackProof = await forceSseFallbackToPolling(guest, room.roomId);
+      fallbackPhone = phone === host ? guest : host;
+      fallbackProof = await forceSseFallbackToPolling(fallbackPhone, room.roomId);
     }
     if (index === 15) {
       await Promise.all([host, guest].map((candidate) => candidate.page.waitForFunction(
@@ -1140,7 +1155,7 @@ async function runMega(host, guest) {
     }
     picks.push({ number: index + 1, seat: event.seat, cardKey: event.cardKey, form: event.form, position: event.position });
     if (index === 0 && transport === "sse") {
-      await guest.page.locator(".connection-banner").waitFor({ state: "hidden", timeout: 4_000 });
+      await fallbackPhone.page.locator(".connection-banner").waitFor({ state: "hidden", timeout: 4_000 });
       await fallbackProof.restore();
       const staleHost = await currentView(room.hostCredential);
       const staleGuest = await currentView(room.guestCredential);
@@ -1193,7 +1208,7 @@ async function runMega(host, guest) {
       : { host: false, guest: false, noRequestsObserved: true },
     polling: transport === "polling" ? { provedAcceptedPickRevisions: polledPickCount, intervalMs: 1_000 } : null,
     pollingFallback: transport === "sse"
-      ? { provedAfterSseInterruption: true, restoredSse: true, intentionalNetworkFaults: guest.collector.intentionalNetworkFaults }
+      ? { provedAfterSseInterruption: true, restoredSse: true, intentionalNetworkFaults: fallbackPhone?.collector.intentionalNetworkFaults ?? 0 }
       : null,
     loadingHandshake: room.loadingHandshake,
     lobbyControls: room.lobbyControls,
@@ -1273,7 +1288,7 @@ async function runPrivateMode(host, guest, mode) {
   const [hostFinal, guestFinal] = await Promise.all([currentView(room.hostCredential), currentView(room.guestCredential)]);
   const hostIds = assertExport(hostFinal, `${mode} host`);
   const guestIds = assertExport(guestFinal, `${mode} guest`);
-  assert(hostFinal.events.length === (mode === "classic" ? 8 : 16), `${mode} final event count is ${hostFinal.events.length}`);
+  assert(hostFinal.events.length === rounds, `${mode} final event count is ${hostFinal.events.length}`);
   assert(guestFinal.events.length === hostFinal.events.length, `${mode} final views disagree on event count`);
   await Promise.all([assertLayout(host, `${mode} iPhone 16 completion`), assertLayout(guest, `${mode} iPhone 16 Pro Max completion`)]);
   await screenshot(host, `${mode}-complete-iphone16`);
@@ -1316,13 +1331,14 @@ async function runPractice(browser) {
     const final = await currentView(credential);
     assertExport(final, "Practice bot host");
     const botEvents = final.events.filter((event) => event.seat === "b" && event.automatic);
+    const botParticipant = final.participants.find((participant) => participant.bot);
     assert(humanPicks === 8, `Practice human completed ${humanPicks} picks instead of 8`);
-    assert(botEvents.length === 8, `Practice bot completed ${botEvents.length} automatic picks instead of 8`);
-    assert(final.participants.some((participant) => participant.bot), "Practice completion does not identify the bot participant");
+    assert(botEvents.length === 0, `Practice exposed ${botEvents.length} private bot pick events to the human`);
+    assert(botParticipant?.deckCount === 8, `Practice bot completed ${botParticipant?.deckCount ?? 0} picks instead of 8`);
     await assertLayout(phone, "Practice phone completion");
     await screenshot(phone, "practice-bot-complete");
     assertPhoneClean(phone);
-    return { roomId, humanPicks, automaticBotPicks: botEvents.length, timer: { mode: initial.settings.timerMode, seconds: initial.settings.pickSeconds } };
+    return { roomId, humanPicks, automaticBotPicks: botParticipant.deckCount, privateBotEventsExposed: botEvents.length, timer: { mode: initial.settings.timerMode, seconds: initial.settings.pickSeconds } };
   } catch (error) {
     await screenshot(phone, "failure-practice").catch(() => undefined);
     summary.diagnostics.push(...phone.collector.issues);
