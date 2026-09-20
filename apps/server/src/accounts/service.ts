@@ -414,7 +414,7 @@ export function createAccountService(options: AccountServiceOptions) {
     createGoogleChallenge, googleLogin,
     providerConfig: () => ({
       google: googleClientId ? { enabled: true, clientId: googleClientId } : { enabled: false },
-      apple: { enabled: false, reason: "Apple web sign-in requires operator credentials and an associated Apple app configuration." },
+      apple: { enabled: false, reason: "Apple web sign-in requires typically paid Apple Developer Program access plus an associated Apple-platform App ID and Services ID." },
     }),
     list: () => rows().map(accountOf), close: () => db.close(),
   };

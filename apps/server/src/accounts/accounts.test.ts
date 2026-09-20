@@ -60,6 +60,44 @@ describe("remembered player accounts", () => {
     cleanup.push(() => app.locals.arenaService.close());
     await request(app).get("/api/accounts").expect(404);
   });
+  it("upgrades the original six-column account table without changing profile identity or retaining a unique tag constraint", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "draft-original-schema-"));
+    cleanup.push(() => rmSync(dir, { recursive: true, force: true }));
+    const databasePath = path.join(dir, "test.sqlite");
+    const database = new DatabaseSync(databasePath);
+    const secret = randomBytes(32).toString("hex");
+    const username = "original";
+    const profileId = "sp_original_profile";
+    const token = createHmac("sha256", secret).update(`club-profile:${username}`).digest("base64url");
+    const salt = randomBytes(16).toString("hex");
+    database.exec(`
+      CREATE TABLE club_account_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE social_profiles (id TEXT PRIMARY KEY,display_name TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+      CREATE TABLE club_accounts (username TEXT PRIMARY KEY,display_name TEXT NOT NULL,tag TEXT NOT NULL UNIQUE,salt TEXT NOT NULL,password_hash TEXT NOT NULL,profile_id TEXT NOT NULL UNIQUE);
+    `);
+    database.prepare("INSERT INTO club_account_meta VALUES('identity_secret',?)").run(secret);
+    database.prepare("INSERT INTO social_profiles VALUES(?,?,?,?,?)").run(profileId, "Original", createHash("sha256").update(token).digest("hex"), 1, 1);
+    database.prepare("INSERT INTO club_accounts VALUES(?,?,?,?,?,?)").run(username, "Original", "#P0LYQ", salt, scryptSync("old display password", salt, 32).toString("hex"), profileId);
+    database.close();
+
+    const app = createArenaApp({ catalog, catalogVersion: "test", databasePath });
+    const accounts = app.locals.accountService as AccountService;
+    expect(accounts.list()).toEqual([expect.objectContaining({ profileId, tag: "#P0LYQ" })]);
+    expect(() => accounts.login({ username: "Original", password: "old display password" })).toThrow(/one-time password migration/i);
+    expect(accounts.register({ displayName: "AlsoTracking", tag: "#P0LYQ", password: "different durable password" }).account.tag).toBe("#P0LYQ");
+    app.locals.arenaService.close();
+
+    const migrated = new DatabaseSync(databasePath);
+    const columns = (migrated.prepare("PRAGMA table_info(club_accounts)").all() as Array<{ name: string }>).map((column) => column.name);
+    const tagIndexes = (migrated.prepare("PRAGMA index_list(club_accounts)").all() as Array<{ name: string; unique: number }>).filter((index) => {
+      const indexed = migrated.prepare(`PRAGMA index_info(${JSON.stringify(index.name)})`).all() as Array<{ name: string }>;
+      return indexed.some((column) => column.name === "tag");
+    });
+    expect(columns).toEqual(expect.arrayContaining(["password_version", "credential_version", "collection_json"]));
+    expect(tagIndexes).toEqual([expect.objectContaining({ unique: 0 })]);
+    expect(migrated.prepare("SELECT count(*) AS count FROM social_profiles WHERE id=?").get(profileId)?.count).toBe(1);
+    migrated.close();
+  });
   it("revokes a legacy bearer across every protected surface and preserves data after credential migration", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "draft-legacy-accounts-"));
     cleanup.push(() => rmSync(dir, { recursive: true, force: true }));
