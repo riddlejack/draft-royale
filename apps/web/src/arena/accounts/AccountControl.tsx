@@ -44,7 +44,7 @@ const loadGoogleScript = () => {
     script.onload = () => window.google?.accounts.id ? resolve() : reject(new Error("Google sign-in did not initialize."));
     script.onerror = () => reject(new Error("Google sign-in could not load."));
     document.head.appendChild(script);
-  });
+  }).catch((error) => { googleScript = null; throw error; });
   return googleScript;
 };
 
@@ -56,8 +56,10 @@ function GoogleSignIn({ clientId, linkToken, onSession, onError }: {
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [preparing, setPreparing] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setPreparing(true);
     void Promise.all([loadGoogleScript(), createGoogleChallenge()]).then(([, challenge]) => {
       if (cancelled || !host.current || !window.google) return;
       host.current.replaceChildren();
@@ -67,9 +69,10 @@ function GoogleSignIn({ clientId, linkToken, onSession, onError }: {
         auto_select: false,
         cancel_on_tap_outside: true,
         callback: ({ credential }) => {
-          if (!credential) { onError("Google did not return a sign-in credential."); return; }
+          if (!credential) { onError("Google did not return a sign-in credential."); setAttempt((value) => value + 1); return; }
           void finishGoogleSignIn(credential, challenge.state, linkToken).then(onSession).catch((failure: unknown) => {
             onError(failure instanceof Error ? failure.message : "Google sign-in failed.");
+            setAttempt((value) => value + 1);
           });
         },
       });
@@ -82,7 +85,7 @@ function GoogleSignIn({ clientId, linkToken, onSession, onError }: {
       onError(failure instanceof Error ? failure.message : "Google sign-in is unavailable.");
     });
     return () => { cancelled = true; };
-  }, [clientId, linkToken, onError, onSession]);
+  }, [attempt, clientId, linkToken, onError, onSession]);
   return <div className="club-google-slot">{preparing ? <span>Preparing secure Google sign-in…</span> : null}<div ref={host} /></div>;
 }
 
