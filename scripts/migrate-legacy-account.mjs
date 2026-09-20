@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createHash, createHmac, randomBytes, scryptSync } from "node:crypto";
+import { randomBytes, scryptSync } from "node:crypto";
 import { existsSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
@@ -21,10 +21,10 @@ const readHidden = (prompt) => new Promise((resolve, reject) => {
     return;
   }
   let value = "";
-  process.stdout.write(prompt);
   process.stdin.setEncoding("utf8");
   process.stdin.setRawMode(true);
   process.stdin.resume();
+  process.stdout.write(prompt);
   const finish = (error) => {
     process.stdin.off("data", onData);
     process.stdin.setRawMode(false);
@@ -59,8 +59,6 @@ if (!username || positionalArgs.length !== 1) {
     const account = database.prepare("SELECT display_name,profile_id,password_version,credential_version FROM club_accounts WHERE username=?").get(username);
     if (!account) throw new Error("No private account has that player name.");
     if (Number(account.password_version) >= 1) throw new Error("That account has already completed its password migration.");
-    const identitySecret = database.prepare("SELECT value FROM club_account_meta WHERE key='identity_secret'").get()?.value;
-    if (typeof identitySecret !== "string" || !identitySecret) throw new Error("The private account identity secret is missing.");
     if (!database.prepare("SELECT 1 FROM social_profiles WHERE id=?").get(account.profile_id)) throw new Error("The linked private social profile is missing.");
 
     const password = await readHidden("New password (12–128 characters): ");
@@ -75,12 +73,20 @@ if (!username || positionalArgs.length !== 1) {
       const current = database.prepare("SELECT password_version FROM club_accounts WHERE username=?").get(username);
       if (!current || Number(current.password_version) >= 1) throw new Error("That account has already completed its password migration.");
       const credentialVersion = Math.max(1, Number(account.credential_version) + 1);
-      const credential = createHmac("sha256", identitySecret).update(`club-profile:${username}:v${credentialVersion}`).digest("base64url");
-      const credentialHash = createHash("sha256").update(credential).digest("hex");
+      // A password reset must not reintroduce the retired deterministic bearer.
+      // This random hash has no corresponding issued credential; login creates
+      // a fresh session through the current account service.
+      const credentialHash = randomBytes(32).toString("hex");
       const salt = randomBytes(16).toString("hex");
       const hash = scryptSync(password, salt, 32).toString("hex");
       database.prepare("UPDATE club_accounts SET salt=?, password_hash=?, password_version=1, credential_version=? WHERE username=?").run(salt, hash, credentialVersion, username);
       database.prepare("UPDATE social_profiles SET token_hash=?, updated_at=? WHERE id=?").run(credentialHash, Date.now(), account.profile_id);
+      if (columns.has("password_enabled")) database.prepare("UPDATE club_accounts SET password_enabled=1 WHERE username=?").run(username);
+      for (const table of ["account_sessions", "social_profile_credentials"]) {
+        if (database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)) {
+          database.prepare(`UPDATE ${table} SET revoked_at=? WHERE profile_id=? AND revoked_at IS NULL`).run(Date.now(), account.profile_id);
+        }
+      }
       database.exec("COMMIT;");
     } catch (error) {
       try { database.exec("ROLLBACK;"); } catch { /* No active transaction. */ }
