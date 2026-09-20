@@ -1,4 +1,4 @@
-import type { MirrorPlaylistKey, MirrorRoomCommand, MirrorRoomCredential, MirrorRoomSessionResponse, MirrorRoomView } from "@draft-royale/shared";
+import type { DeckDefinition, MirrorPlaylistKey, MirrorRoomCommand, MirrorRoomCredential, MirrorRoomSessionResponse, MirrorRoomView } from "@draft-royale/shared";
 
 export class MirrorRoomApiError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
@@ -23,7 +23,7 @@ async function request<T>(path: string, options: { body?: unknown; credential?: 
   return data as T;
 }
 
-export const createMirrorRoom = (name: string, playlist: MirrorPlaylistKey = "classics") => request<MirrorRoomSessionResponse>("/rooms", { body: { name, playlist } });
+export const createMirrorRoom = (name: string, playlist: MirrorPlaylistKey = "classics", deck?: DeckDefinition) => request<MirrorRoomSessionResponse>("/rooms", { body: { name, playlist, ...(deck ? { deck } : {}) } });
 export const joinMirrorRoom = (name: string, code: string) => request<MirrorRoomSessionResponse>("/join", { body: { name, code: code.trim().toUpperCase() } });
 export const getMirrorRoom = (credential: MirrorRoomCredential, signal?: AbortSignal) => request<{ room: MirrorRoomView }>(`/rooms/${encodeURIComponent(credential.roomId)}`, { credential, signal });
 export const commandMirrorRoom = (credential: MirrorRoomCredential, command: MirrorRoomCommand) => request<{ room: MirrorRoomView }>(`/rooms/${encodeURIComponent(credential.roomId)}/command`, { credential, body: command });

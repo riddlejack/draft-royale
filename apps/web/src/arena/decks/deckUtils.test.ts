@@ -25,10 +25,10 @@ const deck: DeckDefinition = {
 describe("deck workshop utilities", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("preserves the requested deck order in exports, including special forms", () => {
+  it("normalizes Evolution, Hero, and wild forms into the required Clash special slots", () => {
     expect(orderedDeckKeys(deck)).toEqual(["card-3", "card-5", "card-7", "card-0", "card-1", "card-2", "card-4", "card-6"]);
     const link = decodeURIComponent(clashDeckLink(deck, new Map(cards.map((card) => [card.key, card]))));
-    expect(link).toContain("copyDeck?deck=26000000;26000001;26000002;26000003;26000004;26000005;26000006;26000007");
+    expect(link).toContain("copyDeck?deck=26000003;26000005;26000007;26000000;26000001;26000002;26000004;26000006");
   });
 
   it("imports standard Clash and RoyaleAPI deck links", () => {

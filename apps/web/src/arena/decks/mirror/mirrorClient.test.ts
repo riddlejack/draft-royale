@@ -18,6 +18,13 @@ describe("Mirror room client", () => {
     expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body)).toEqual({ name: "Guest", code: "ABCD12" });
   });
 
+  it("can create a room from a host-selected legal deck", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => response });
+    vi.stubGlobal("fetch", fetchMock);
+    await createMirrorRoom("Host", "classics", { id: "custom", name: "Our deck", mode: "custom", cards: ["one", "two", "three", "four", "five", "six", "seven", "eight"], source: { kind: "local", label: "Test" } });
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body)).toMatchObject({ name: "Host", playlist: "classics", deck: { name: "Our deck", cards: ["one", "two", "three", "four", "five", "six", "seven", "eight"] } });
+  });
+
   it("authenticates a revision-bound command", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ room: response.room }) });
     vi.stubGlobal("fetch", fetchMock);

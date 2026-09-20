@@ -24,6 +24,10 @@ const catalog: ArenaCard[] = [
     forms: [{ key: "base" as const, label: "Base", asset: `/card-${index + 1}.png` }],
   })),
 ];
+for (const [key, form] of [["card-1", "evolution"], ["card-2", "hero"]] as const) {
+  const card = catalog.find((candidate) => candidate.key === key)!;
+  card.forms = [...card.forms, { key: form, label: `${card.name} ${form}`, asset: `/${key}-${form}.png` }];
+}
 
 const deck = (id: string, name: string, start: number, mode: DeckDefinition["mode"], source: DeckDefinition["source"]): DeckDefinition => ({
   id,
@@ -48,8 +52,8 @@ const createDatabase = () => {
   roots.push(root);
   return path.join(root, "arena.sqlite");
 };
-const service = (databasePath = createDatabase()) => {
-  const result = createMirrorRoomService({ databasePath, catalog, getDecks: () => decks });
+const service = (databasePath = createDatabase(), sourceDecks: readonly DeckDefinition[] = decks) => {
+  const result = createMirrorRoomService({ databasePath, catalog, getDecks: () => sourceDecks });
   services.push(result);
   return result;
 };
@@ -146,11 +150,32 @@ describe("synchronized Mirror room service", () => {
     expect(updated.deck.cards).toEqual(["card-1", "card-2", "card-3", "card-4", "card-5", "card-6", "card-7", "card-8"]);
   });
 
+  it("keeps a host-selected card order and special forms identical for both seats", () => {
+    const mirror = service();
+    const custom = { ...deck("special", "Special order", 1, "custom", { kind: "local", label: "Host" }), forms: { "card-1": "evolution" as const, "card-2": "hero" as const } };
+    const host = mirror.create({ name: "Host", deck: custom });
+    const guest = mirror.join({ code: host.room.code, name: "Guest" });
+    const hostView = mirror.get(host.room.id, host.credential.token);
+    const guestView = mirror.get(host.room.id, guest.credential.token);
+    expect(hostView.deck).toMatchObject({ cards: custom.cards, forms: custom.forms });
+    expect(guestView.deck).toEqual(hostView.deck);
+  });
+
   it("does not expose a generated Mirror playlist while preserving legacy room snapshots", () => {
     const mirror = service();
     const room = mirror.create({ name: "Host" });
     expect(room.room.availablePlaylists.map((playlist) => playlist.id)).toEqual(["classics", "community"]);
     expect(() => mirror.create({ name: "Host", playlist: "mirror" })).toThrowError(/classics or community/i);
+  });
+
+  it("starts from a host-built deck when no curated playlist has a candidate", () => {
+    const mirror = service(createDatabase(), []);
+    const custom = deck("host-deck", "Our deck", 1, "custom", { kind: "local", label: "Host" });
+    const room = mirror.create({ name: "Host", deck: custom });
+    expect(room.room.deck.cards).toEqual(custom.cards);
+    expect(room.room.deck.cards).not.toContain("mirror");
+    expect(room.room.availablePlaylists.map((playlist) => playlist.count)).toEqual([0, 0]);
+    expect(() => mirror.create({ name: "Host" })).toThrowError(/no legal decks/i);
   });
 
   it("persists synchronized history and credentials across a service restart", () => {
