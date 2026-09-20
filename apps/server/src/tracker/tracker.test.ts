@@ -35,6 +35,7 @@ const serviceWithLogs = (options: {
   logs: Record<string, unknown[] | { status: number; retryAfter?: string }>;
   now?: () => number;
   calls?: string[];
+  profiles?: Record<string, () => unknown>;
 }) => {
   const getPlayers = options.players ?? (() => initialPlayers);
   const service = createTrackerService({
@@ -43,6 +44,7 @@ const serviceWithLogs = (options: {
     fetchImpl: (async (input) => {
       const url = String(input);
       const tag = getPlayers().map((player) => player.tag).find((candidate) => url.includes(encodeURIComponent(candidate))) ?? "";
+      if (!url.endsWith("/battlelog")) return new Response(JSON.stringify(options.profiles?.[tag]?.() ?? {}), { status: options.profiles?.[tag] ? 200 : 404 });
       options.calls?.push(tag);
       const value = options.logs[tag] ?? [];
       if (!Array.isArray(value)) return new Response("{}", { status: value.status, headers: value.retryAfter ? { "Retry-After": value.retryAfter } : undefined });
@@ -211,6 +213,24 @@ describe("full battle detail", () => {
     const inspection = new DatabaseSync(databasePath, { readOnly: true });
     expect(inspection.prepare("SELECT count(*) AS count FROM tracker_battle_raw").get()).toMatchObject({ count: 1 });
     inspection.close();
+  });
+});
+
+describe("profile counter snapshots", () => {
+  it("records counters when battles arrive and audits them against recorded battles by type", async () => {
+    let timestamp = Date.parse("2026-09-08T20:40:00Z");
+    const tag = initialPlayers[0]!.tag;
+    let battleCount = 1_000;
+    const logs: Record<string, unknown[]> = { [tag]: [battle([participant(initialPlayers[0]!, 2)], [participant(initialPlayers[1]!, 1)], "20260908T203000.000Z")] };
+    const service = serviceWithLogs({ now: () => timestamp, logs, profiles: { [tag]: () => ({ tag, battleCount, wins: 600, losses: 400, trophies: 9_000 }) } });
+    await service.syncNow([tag]);
+    timestamp += 30 * 60_000; battleCount += 1;
+    logs[tag] = [{ ...battle([participant(initialPlayers[0]!, 1)], [participant(initialPlayers[1]!, 2)], "20260908T205500.000Z"), type: "PvP" }, ...logs[tag]!];
+    await service.syncNow([tag]);
+    timestamp += 60_000;
+    await service.syncNow([tag]);
+    expect(service.getBattleCountAudit(new Set(["a"]), tag)).toMatchObject({ battleCountDelta: 1, recordedByType: [{ type: "PvP", games: 1 }] });
+    expect(() => service.getBattleCountAudit(new Set(["b"]), tag)).toThrow("outside your visible tracker scope");
   });
 });
 

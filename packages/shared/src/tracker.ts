@@ -167,6 +167,17 @@ export interface TrackerCoverage {
   };
 }
 
+/** Compares the profile's lifetime counters with recorded battles between the first and last profile snapshot. */
+export interface TrackerBattleCountAudit {
+  playerTag: string;
+  fromAt: number | null;
+  toAt: number | null;
+  battleCountDelta: number | null;
+  winsDelta: number | null;
+  lossesDelta: number | null;
+  recordedByType: Array<{ type: string; games: number }>;
+}
+
 export interface TrackerFilters {
   playerTag: string;
   opponentTag: string | null;

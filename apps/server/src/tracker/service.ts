@@ -6,6 +6,7 @@ import type {
   ManualTrackerResultResponse,
   TrackerBattle,
   TrackerBattleProvenance,
+  TrackerBattleCountAudit,
   TrackerBattleResult,
   TrackerCard,
   TrackerCardForm,
@@ -39,6 +40,7 @@ const MAX_BATTLES_PER_RESPONSE = 100;
 const MAX_RECENT_BATTLES = 100;
 const MANUAL_SYNC_COOLDOWN_MS = 30_000;
 const ACTIVE_WINDOW_MS = 10 * 60_000;
+const PROFILE_SNAPSHOT_IDLE_MS = 6 * 60 * 60_000;
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -149,6 +151,7 @@ export interface TrackerService {
   getSummary(request: TrackerSummaryRequest): TrackerSummary;
   syncNow(tags?: readonly string[]): Promise<TrackerPollStatus>;
   requestSync(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, rawTag?: unknown): Promise<TrackerPollStatus>;
+  getBattleCountAudit(visibleProfileIds: ReadonlySet<string>, rawTag: unknown): TrackerBattleCountAudit;
   importHistorical(parsed: ParsedHistoricalImport, kind: "operator_snapshot" | "user_import", label?: string): TrackerImportResult;
   addManualResult(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, input: unknown): ManualTrackerResultResponse;
   undoManualResult(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, battleId: unknown, input: unknown): UndoManualTrackerResultResponse;
@@ -409,6 +412,11 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
     CREATE TABLE IF NOT EXISTS tracker_coverage_gaps (
       player_tag TEXT NOT NULL, gap_start TEXT NOT NULL, gap_end TEXT NOT NULL, detected_at INTEGER NOT NULL,
       reason TEXT NOT NULL, PRIMARY KEY (player_tag, gap_start, gap_end)
+    );
+    CREATE TABLE IF NOT EXISTS tracker_profile_snapshots (
+      player_tag TEXT NOT NULL, fetched_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, battle_count INTEGER, wins INTEGER, losses INTEGER,
+      three_crown_wins INTEGER, trophies INTEGER, best_trophies INTEGER, exp_level INTEGER, path_of_legend_json TEXT, current_deck_json TEXT,
+      PRIMARY KEY (player_tag, fetched_at)
     );
     CREATE TABLE IF NOT EXISTS tracker_battle_raw (
       battle_id TEXT PRIMARY KEY, observer_tag TEXT NOT NULL, stored_at INTEGER NOT NULL, raw_json TEXT NOT NULL,
@@ -877,6 +885,46 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
     } finally { clearTimeout(timeout); activeControllers.delete(controller); }
   };
 
+  // The profile's lifetime counters are the only independent check on the rolling battle log, and they date trophy progress.
+  const snapshotProfile = async (tag: string, fetchedAt: number) => {
+    const controller = new AbortController(); activeControllers.add(controller);
+    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+    try {
+      const response = await fetchImpl(`${apiBaseUrl}/players/${encodeURIComponent(tag)}`, { headers: { Authorization: `Bearer ${apiToken}`, Accept: "application/json" }, signal: controller.signal });
+      if (!response.ok) return;
+      const profile: unknown = JSON.parse(await response.text());
+      if (!isRecord(profile) || normalizeTrackerTag(profile.tag) !== tag || closed) return;
+      const counters = [integer(profile.battleCount), integer(profile.wins), integer(profile.losses), integer(profile.threeCrownWins), integer(profile.trophies)];
+      const latest = db.prepare("SELECT fetched_at,battle_count,wins,losses,three_crown_wins,trophies FROM tracker_profile_snapshots WHERE player_tag=? ORDER BY fetched_at DESC LIMIT 1").get(tag) as { fetched_at: number; battle_count: number | null; wins: number | null; losses: number | null; three_crown_wins: number | null; trophies: number | null } | undefined;
+      if (latest && [latest.battle_count, latest.wins, latest.losses, latest.three_crown_wins, latest.trophies].every((value, index) => value === counters[index])) {
+        db.prepare("UPDATE tracker_profile_snapshots SET last_seen_at=? WHERE player_tag=? AND fetched_at=?").run(fetchedAt, tag, latest.fetched_at);
+        return;
+      }
+      const pathOfLegend = isRecord(profile.currentPathOfLegendSeasonResult) ? JSON.stringify(profile.currentPathOfLegendSeasonResult) : null;
+      db.prepare(`INSERT OR IGNORE INTO tracker_profile_snapshots(player_tag,fetched_at,last_seen_at,battle_count,wins,losses,three_crown_wins,trophies,best_trophies,exp_level,path_of_legend_json,current_deck_json)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(tag, fetchedAt, fetchedAt, ...counters, integer(profile.bestTrophies), integer(profile.expLevel), pathOfLegend, JSON.stringify(parseCards(profile.currentDeck)));
+    } catch { /* A missed profile snapshot never blocks battle collection; the next poll retries. */ }
+    finally { clearTimeout(timeout); activeControllers.delete(controller); }
+  };
+  const profileSnapshotDue = (tag: string, insertedCount: number) => {
+    const latest = db.prepare("SELECT max(last_seen_at) AS seen FROM tracker_profile_snapshots WHERE player_tag=?").get(tag) as { seen: number | null };
+    return insertedCount > 0 || latest.seen === null || now() - latest.seen >= PROFILE_SNAPSHOT_IDLE_MS;
+  };
+
+  const getBattleCountAudit = (visibleProfileIds: ReadonlySet<string>, rawTag: unknown): TrackerBattleCountAudit => {
+    ensureOpen();
+    const tag = normalizeTrackerTag(rawTag);
+    if (!tag || !visibleTags(visibleProfileIds).has(tag)) throw new TrackerError(403, "That player is outside your visible tracker scope", "TRACKER_FORBIDDEN");
+    const snapshots = db.prepare("SELECT fetched_at,battle_count,wins,losses FROM tracker_profile_snapshots WHERE player_tag=? AND battle_count IS NOT NULL ORDER BY fetched_at").all(tag) as Array<{ fetched_at: number; battle_count: number; wins: number | null; losses: number | null }>;
+    const first = snapshots[0]; const last = snapshots.at(-1);
+    if (!first || !last || first === last) return { playerTag: tag, fromAt: first?.fetched_at ?? null, toAt: last?.fetched_at ?? null, battleCountDelta: null, winsDelta: null, lossesDelta: null, recordedByType: [] };
+    const rows = db.prepare(`SELECT b.type AS type,count(*) AS games FROM tracker_battles b JOIN tracker_participants p ON p.battle_id=b.id
+      WHERE p.player_tag=? AND b.source='api' AND b.battle_time > ? AND b.battle_time <= ? GROUP BY b.type ORDER BY games DESC`)
+      .all(tag, new Date(first.fetched_at).toISOString(), new Date(last.fetched_at).toISOString()) as Array<{ type: string; games: number }>;
+    const delta = (left: number | null, right: number | null) => left === null || right === null ? null : right - left;
+    return { playerTag: tag, fromAt: first.fetched_at, toAt: last.fetched_at, battleCountDelta: last.battle_count - first.battle_count, winsDelta: delta(first.wins, last.wins), lossesDelta: delta(first.losses, last.losses), recordedByType: rows.map((row) => ({ type: row.type, games: Number(row.games) })) };
+  };
+
   const jitter = (delay: number) => Math.max(10_000, Math.round(delay * (1 + (random() * 2 - 1) * jitterRatio)));
   const recordAttempt = (tag: string, attemptedAt: number, completedAt: number, success: boolean, responseCount: number, insertedCount: number, oldest: string | null, newest: string | null, error: string | null, retryAfterMs: number | null, possibleGap: boolean) => {
     db.prepare(`INSERT INTO tracker_poll_attempts(id,player_tag,attempted_at,completed_at,success,response_count,inserted_count,window_oldest,window_newest,error,retry_after_ms,possible_gap)
@@ -911,6 +959,7 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
           .run(displayName, attemptedAt, now(), next, battles.length, idleStreak, possibleGap ? 1 : 0, oldest ?? prior?.last_window_oldest ?? null, newest ?? prior?.last_window_newest ?? null, keys.length ? JSON.stringify(keys.slice(0, 100)) : prior?.last_window_keys_json ?? "[]", tag);
         recordAttempt(tag, attemptedAt, now(), true, battles.length, insertedCount, oldest, newest, null, null, possibleGap);
       });
+      if (profileSnapshotDue(tag, insertedCount)) await snapshotProfile(tag, now());
     } catch (error) {
       const failure = error instanceof ApiPollError ? error : new ApiPollError("Clash API polling failed");
       const failures = Math.min((prior?.consecutive_failures ?? 0) + 1, 8);
@@ -987,5 +1036,5 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
 
   reconcileSubscriptions();
   if (autoStart && apiToken) schedule();
-  return { getRegisteredPlayers, getStatus, getSummary, syncNow, requestSync, importHistorical, addManualResult, undoManualResult, close };
+  return { getRegisteredPlayers, getStatus, getSummary, syncNow, requestSync, getBattleCountAudit, importHistorical, addManualResult, undoManualResult, close };
 };
