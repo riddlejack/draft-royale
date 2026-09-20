@@ -12,6 +12,10 @@ import type {
   TrackerCardForm,
   TrackerCardTally,
   TrackerCoverage,
+  TrackerDeckLog,
+  TrackerDeckLogEntry,
+  TrackerDeckLogMode,
+  TrackerDeckOrigin,
   TrackerDeckMatchupTally,
   TrackerDeckTally,
   TrackerFilters,
@@ -152,6 +156,7 @@ export interface TrackerService {
   syncNow(tags?: readonly string[]): Promise<TrackerPollStatus>;
   requestSync(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, rawTag?: unknown): Promise<TrackerPollStatus>;
   getBattleCountAudit(visibleProfileIds: ReadonlySet<string>, rawTag: unknown): TrackerBattleCountAudit;
+  getDeckLog(request: { actorProfileId: string; visibleProfileIds: ReadonlySet<string>; playerTag?: unknown }): TrackerDeckLog;
   importHistorical(parsed: ParsedHistoricalImport, kind: "operator_snapshot" | "user_import", label?: string): TrackerImportResult;
   addManualResult(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, input: unknown): ManualTrackerResultResponse;
   undoManualResult(actorProfileId: string, visibleProfileIds: ReadonlySet<string>, battleId: unknown, input: unknown): UndoManualTrackerResultResponse;
@@ -226,6 +231,13 @@ const canonicalBattleKey = (battleTime: string, type: string, modeId: number | n
 const deckSignature = (cards: TrackerCard[]) => [...cards]
   .sort((left, right) => `${left.id ?? left.key}:${left.form}`.localeCompare(`${right.id ?? right.key}:${right.form}`))
   .map((card) => `${card.id ?? card.key}:${card.form}`).join("|");
+
+const CHOSEN_DECK_SELECTIONS = new Set(["collection", "warDeckPick", "quadDeckPick"]);
+/** Battles recorded before deckSelection was kept fall back to the mode name, which names mirror, draft and pick modes. */
+export const deckOriginOf = (deckSelection: string | null | undefined, modeName: string): { origin: TrackerDeckOrigin; inferred: boolean } =>
+  deckSelection
+    ? { origin: CHOSEN_DECK_SELECTIONS.has(deckSelection) ? "chosen" : "assigned", inferred: false }
+    : { origin: /mirror|draft|pickmode/i.test(modeName) ? "assigned" : "chosen", inferred: true };
 
 const resultForSide = (side: 0 | 1, teamCrowns: [number | null, number | null]): TrackerBattleResult => {
   const own = teamCrowns[side];
@@ -780,6 +792,44 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
     };
   };
 
+  const getDeckLog = (request: { actorProfileId: string; visibleProfileIds: ReadonlySet<string>; playerTag?: unknown }): TrackerDeckLog => {
+    ensureOpen(); reconcileSubscriptions();
+    const players = visiblePlayers(request.visibleProfileIds);
+    const playerTag = normalizeFilters(players, request.actorProfileId, { playerTag: normalizeTrackerTag(request.playerTag) }).playerTag;
+    const entries = new Map<string, TrackerDeckLogEntry>();
+    const modesByEntry = new Map<string, Map<string, TrackerDeckLogMode>>();
+    let battlesWithDecks = 0;
+    for (const battle of visibleBattles(request.actorProfileId, request.visibleProfileIds)) {
+      const focus = battle.participants.find((participant) => participant.tag === playerTag);
+      // Duels report every round's cards together, so only an exact eight-card list is one deck.
+      if (!focus || focus.cards.length !== 8) continue;
+      battlesWithDecks += 1;
+      const { origin, inferred } = deckOriginOf(battle.deckSelection, battle.mode.name);
+      const signature = deckSignature(focus.cards);
+      const key = `${origin}\u0000${signature}`;
+      let entry = entries.get(key);
+      if (!entry) {
+        const costs = focus.cards.map((card) => card.elixirCost);
+        const elixirKnown = costs.every((cost) => cost !== null);
+        entry = { signature, cards: focus.cards.map(bareCard), towerTroop: null, origin, originInferred: true, deckSelections: [], firstUsedAt: battle.battleTime, lastUsedAt: battle.battleTime, averageElixir: elixirKnown ? (costs as number[]).reduce((sum, cost) => sum + cost, 0) / 8 : null, modes: [], ...emptyTally() };
+        entries.set(key, entry); modesByEntry.set(key, new Map());
+      }
+      addResult(entry, focus.result);
+      if (!inferred) entry.originInferred = false;
+      if (battle.deckSelection && !entry.deckSelections.includes(battle.deckSelection)) entry.deckSelections.push(battle.deckSelection);
+      if (battle.battleTime < entry.firstUsedAt) entry.firstUsedAt = battle.battleTime;
+      // Battles arrive newest first, so the first tower troop seen is the most recent one.
+      if (!entry.towerTroop && focus.supportCards?.[0]) entry.towerTroop = bareCard(focus.supportCards[0]);
+      const modes = modesByEntry.get(key)!;
+      const modeKey = `${battle.type}\u0000${battle.mode.id ?? battle.mode.name}`;
+      const mode = modes.get(modeKey) ?? { modeId: battle.mode.id, modeName: battle.mode.name, type: battle.type, ...emptyTally() };
+      addResult(mode, focus.result); modes.set(modeKey, mode);
+    }
+    const decks = [...entries.entries()].map(([key, entry]) => finalizeTally({ ...entry, deckSelections: entry.deckSelections.sort(), modes: [...modesByEntry.get(key)!.values()].map(finalizeTally).sort((left, right) => right.games - left.games) }))
+      .sort((left, right) => right.lastUsedAt.localeCompare(left.lastUsedAt)).slice(0, 500);
+    return { generatedAt: now(), playerTag, players, battlesWithDecks, decks };
+  };
+
   const commandReplay = (actorProfileId: string, commandId: string, action: string, hash: string) => {
     const row = db.prepare("SELECT action,payload_hash,result_id FROM tracker_commands WHERE actor_profile_id = ? AND command_id = ?").get(actorProfileId, commandId) as unknown as CommandRow | undefined;
     if (!row) return null;
@@ -1036,5 +1086,5 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
 
   reconcileSubscriptions();
   if (autoStart && apiToken) schedule();
-  return { getRegisteredPlayers, getStatus, getSummary, syncNow, requestSync, getBattleCountAudit, importHistorical, addManualResult, undoManualResult, close };
+  return { getRegisteredPlayers, getStatus, getSummary, syncNow, requestSync, getBattleCountAudit, getDeckLog, importHistorical, addManualResult, undoManualResult, close };
 };

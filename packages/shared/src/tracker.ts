@@ -167,6 +167,39 @@ export interface TrackerCoverage {
   };
 }
 
+export interface TrackerDeckLogMode extends TrackerTally {
+  modeId: number | null;
+  modeName: string;
+  type: string;
+}
+
+/** One distinct eight-card deck a player has been observed using, aggregated across every recorded battle. */
+export interface TrackerDeckLogEntry extends TrackerTally {
+  signature: string;
+  cards: TrackerCard[];
+  towerTroop: TrackerCard | null;
+  origin: TrackerDeckOrigin;
+  /** True when no battle for this deck recorded deckSelection, so origin was inferred from the mode name. */
+  originInferred: boolean;
+  deckSelections: string[];
+  firstUsedAt: string;
+  lastUsedAt: string;
+  averageElixir: number | null;
+  modes: TrackerDeckLogMode[];
+}
+
+export interface TrackerDeckLog {
+  generatedAt: number;
+  playerTag: string;
+  players: TrackerPlayer[];
+  battlesWithDecks: number;
+  decks: TrackerDeckLogEntry[];
+}
+
+export interface TrackerDeckLogResponse {
+  deckLog: TrackerDeckLog;
+}
+
 /** Compares the profile's lifetime counters with recorded battles between the first and last profile snapshot. */
 export interface TrackerBattleCountAudit {
   playerTag: string;

@@ -315,6 +315,31 @@ describe("filters and analytics", () => {
   });
 });
 
+describe("deck log", () => {
+  it("deduplicates decks per player, separates assigned decks, and scopes access to visible tags", async () => {
+    const ladder = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: `Ladder ${index + 1}`, elixirCost: 3 }));
+    const mirrored = Array.from({ length: 8 }, (_, index) => ({ id: index + 201, name: `Mirror ${index + 1}`, elixirCost: 4 }));
+    const [alpha, bravo] = [initialPlayers[0]!, initialPlayers[1]!];
+    const tower = { supportCards: [{ id: 159_000_000, name: "Tower Princess" }] };
+    const logs = { [alpha.tag]: [
+      { ...battle([{ ...participant(alpha, 3, [...ladder].reverse()), ...tower }], [participant(bravo, 0, mirrored)], "20260908T203000.000Z", "Ladder"), type: "PvP", deckSelection: "collection" },
+      { ...battle([participant(alpha, 0, ladder)], [participant(bravo, 1, mirrored)], "20260907T203000.000Z", "Ladder"), type: "PvP", deckSelection: "collection" },
+      { ...battle([participant(alpha, 2, mirrored)], [participant(bravo, 1, mirrored)], "20260906T203000.000Z", "MirrorDeck_Friendly"), deckSelection: "predefined" },
+      battle([participant(alpha, 1, mirrored)], [participant(bravo, 2, mirrored)], "20260905T203000.000Z", "MirrorDeck_Friendly"),
+      battle([participant(alpha, 1, ladder.slice(0, 5))], [participant(bravo, 2, mirrored)], "20260904T203000.000Z", "Ladder"),
+    ] };
+    const service = serviceWithLogs({ logs });
+    await service.syncNow([alpha.tag]);
+    const log = service.getDeckLog({ actorProfileId: "a", visibleProfileIds: new Set(["a"]), playerTag: alpha.tag });
+    expect(log).toMatchObject({ playerTag: alpha.tag, battlesWithDecks: 4 });
+    expect(log.decks).toHaveLength(2);
+    expect(log.decks[0]).toMatchObject({ origin: "chosen", originInferred: false, games: 2, wins: 1, losses: 1, winRate: 0.5, averageElixir: 3, firstUsedAt: "2026-09-07T20:30:00.000Z", lastUsedAt: "2026-09-08T20:30:00.000Z", towerTroop: { name: "Tower Princess" }, modes: [{ modeName: "Ladder", type: "PvP", games: 2 }] });
+    expect(log.decks[1]).toMatchObject({ origin: "assigned", originInferred: false, games: 2, deckSelections: ["predefined"] });
+    expect(service.getDeckLog({ actorProfileId: "a", visibleProfileIds: new Set(["a", "b"]), playerTag: bravo.tag }).decks.map((deck) => [deck.origin, deck.games, deck.originInferred])).toEqual([["chosen", 3, false], ["assigned", 2, false]]);
+    expect(service.getDeckLog({ actorProfileId: "c", visibleProfileIds: new Set(["c"]), playerTag: alpha.tag })).toMatchObject({ playerTag: initialPlayers[2]!.tag, decks: [] });
+  });
+});
+
 describe("tracker HTTP privacy", () => {
   it("rejects unauthenticated summary access before reading tracker data", async () => {
     const tracker = createTrackerService({ databasePath: ":memory:", getPlayers: () => initialPlayers, autoStart: false }); services.push(tracker);

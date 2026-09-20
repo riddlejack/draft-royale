@@ -65,6 +65,7 @@ export const createTrackerRouter = (tracker: TrackerService, social: SocialServi
       dateTo: queryText(request.query.dateTo),
     },
   }) })));
+  router.get("/api/tracker/decks", authenticated((auth, scope, request, response) => response.json({ deckLog: tracker.getDeckLog({ actorProfileId: auth.profile.id, visibleProfileIds: scope, playerTag: queryText(request.query.playerTag) }) })));
   router.get("/api/tracker/battle-count-audit", authenticated((_auth, scope, request, response) => response.json({ audit: tracker.getBattleCountAudit(scope, queryText(request.query.playerTag)) })));
   router.post("/api/tracker/sync", authenticated(async (auth, scope, request, response) =>
     response.status(202).json({ status: await tracker.requestSync(auth.profile.id, scope, request.body?.playerTag) })));
