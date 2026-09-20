@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
-  "asOf": "2026-09-05",
-  "generatedAt": "2026-09-05T21:26:33.930Z",
+  "asOf": "2026-09-20",
+  "generatedAt": "2026-09-20T16:59:48.932Z",
   "output": "data/catalog/arena-catalog.json",
   "scope": {
-    "included": "All normal playable battle-card identities and released base, Evolution, Hero, or Champion forms available by 2026-09-05.",
-    "excluded": "Tower troops, temporary/event Super cards, and content first released after 2026-09-05."
+    "included": "All normal playable battle-card identities and released base, Evolution, Hero, or Champion forms available by 2026-09-20.",
+    "excluded": "Tower troops, temporary/event Super cards, and content first released after 2026-09-20."
   },
   "counts": {
-    "cards": 122,
-    "forms": 180,
-    "base": 114,
+    "cards": 123,
+    "forms": 182,
+    "base": 115,
     "evolution": 42,
-    "hero": 16,
+    "hero": 17,
     "champion": 8
   },
   "baseline": {
@@ -98,13 +98,13 @@
       ]
     },
     {
-      "id": "supercell-september-future-release",
+      "id": "supercell-september-season",
       "publisher": "Supercell / Clash Royale",
       "title": "New Season: Minion Academy!",
       "publishedAt": "2026-09-07",
       "url": "https://supercell.com/en/games/clashroyale/blog/release-notes/new-season-minion-academy/",
       "supports": [
-        "Minion Giant and Hero Ice Wizard release after the September 5 cutoff and are excluded"
+        "Minion Giant and Hero Ice Wizard were released by the September 20 cutoff"
       ]
     }
   ],
@@ -132,6 +132,19 @@
         "Ronin card ID is 26000106"
       ],
       "accessNote": "Reviewed from the current rendered page's embedded public card object; the official API snapshot predates Ronin."
+    },
+    {
+      "id": "deckshop-september-copydeck",
+      "authority": "supplemental",
+      "publisher": "Deck Shop",
+      "title": "Live deck detail copyDeck exports",
+      "retrievedAt": "2026-09-20",
+      "url": "https://www.deckshop.pro/deck/detail/evo-bats,hero-ice-wizard,goblinstein,minion-giant,skeletons,goblin-hut,fireball,barbarian-barrel",
+      "supports": [
+        "Minion Giant exports as card ID 26000107",
+        "Hero Ice Wizard exports as the existing Ice Wizard card ID 26000023"
+      ],
+      "accessNote": "Direct live copyDeck href reviewed on 2026-09-20; used to corroborate the official release article because the public token-free API does not expose current card data."
     }
   ],
   "reviewedChanges": [
@@ -150,6 +163,37 @@
         "supercell-ronin-release",
         "supercell-support-ronin",
         "noff-current-card-data"
+      ]
+    },
+    {
+      "status": "Verified",
+      "cardKey": "minion-giant",
+      "change": "Added released base battle card",
+      "effectiveAt": "2026-09-07",
+      "fields": {
+        "id": 26000107,
+        "elixir": 4,
+        "rarity": "rare",
+        "kind": "troop"
+      },
+      "sources": [
+        "supercell-september-season",
+        "deckshop-september-copydeck"
+      ]
+    },
+    {
+      "status": "Verified",
+      "cardKey": "ice-wizard",
+      "change": "Hero form added to the existing Ice Wizard identity",
+      "effectiveAt": "2026-09-07",
+      "fields": {
+        "id": 26000023,
+        "form": "hero",
+        "elixir": 3
+      },
+      "sources": [
+        "supercell-september-season",
+        "deckshop-september-copydeck"
       ]
     },
     {
@@ -193,20 +237,7 @@
       ]
     }
   ],
-  "cutoffExclusions": [
-    {
-      "status": "Verified",
-      "item": "Minion Giant",
-      "reason": "First released 2026-09-07, two days after the cutoff.",
-      "source": "supercell-september-future-release"
-    },
-    {
-      "status": "Verified",
-      "item": "Hero Ice Wizard",
-      "reason": "First released 2026-09-07, two days after the cutoff.",
-      "source": "supercell-september-future-release"
-    }
-  ],
+  "cutoffExclusions": [],
   "slotRules": {
     "status": "Verified",
     "effectiveAt": "2026-03-16",
@@ -233,7 +264,7 @@
     {
       "status": "Reported",
       "cardKey": "mirror",
-      "note": "ArenaCard requires a number. The catalog carries the legacy public-data value 1, representing Mirror's +1 surcharge; actual deployment cost depends on the previous card."
+      "note": "Mirror is modeled as { kind: previous_card_plus, surcharge: 1 }, not as a fixed 1-Elixir card. Numeric elixir filters exclude it; a user may add it explicitly through manual pool overrides. Deck averages are null/labelled as variable when it is present."
     },
     {
       "status": "Verified",
@@ -248,12 +279,12 @@
     "implementationGuidance": "Keep exporting ordered base IDs. Do not guess form markers; show selected forms beside the link so the player can set the Evolution, Hero, and Wild slots in game."
   },
   "assets": {
-    "required": 180,
-    "verifiedThisRun": 180,
-    "changedThisRun": 0,
+    "required": 182,
+    "verifiedThisRun": 182,
+    "changedThisRun": 2,
     "sources": {
       "officialApiCdn": "Official iconUrls from the June 25 API snapshot, plus validated Hero CDN URLs for Valkyrie and Berserker.",
-      "officialNewsCdn": "Official Supercell article artwork for Ronin and Elite Barbarians Evolution, whose current icon URLs were absent from the snapshot."
+      "officialNewsCdn": "Official Supercell article artwork for Ronin, Elite Barbarians Evolution, Minion Giant, and Hero Ice Wizard, whose current icon URLs were absent from the snapshot."
     },
     "verification": "Every referenced file returned HTTP 200 and passed PNG signature/IHDR dimension checks."
   },
@@ -264,32 +295,32 @@
       {
         "id": "supercell-ronin-release",
         "status": "verified",
-        "bytes": 50283
+        "bytes": 50167
       },
       {
         "id": "supercell-august-season",
         "status": "verified",
-        "bytes": 52762
+        "bytes": 52646
       },
       {
         "id": "supercell-august-balance",
         "status": "verified",
-        "bytes": 150415
+        "bytes": 150285
       },
       {
         "id": "supercell-slot-rework",
         "status": "verified",
-        "bytes": 79790
+        "bytes": 79674
       },
       {
         "id": "supercell-two-champions",
         "status": "verified",
-        "bytes": 121132
+        "bytes": 121016
       },
       {
-        "id": "supercell-september-future-release",
+        "id": "supercell-september-season",
         "status": "verified",
-        "bytes": 76257
+        "bytes": 76141
       }
     ]
   }

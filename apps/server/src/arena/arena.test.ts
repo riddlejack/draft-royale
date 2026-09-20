@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { filterArenaCards, isChaosSupportedCard, type ArenaCard, type ArenaSettings, type ArenaView } from "@draft-royale/shared";
+import { filterArenaCards, isChaosSupportedCard, isFixedArenaElixirCost, type ArenaCard, type ArenaSettings, type ArenaView } from "@draft-royale/shared";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { createArenaApp, createArenaService, type ArenaService } from "./index.js";
@@ -28,7 +28,7 @@ const catalog: ArenaCard[] = [
     key: "mirror",
     id: 28_000_006,
     name: "Mirror",
-    elixir: 1,
+    elixir: { kind: "previous_card_plus", surcharge: 1 },
     rarity: "epic",
     kind: "spell",
     families: ["spell"],
@@ -314,11 +314,12 @@ describe("authoritative arena service", () => {
       expect.objectContaining({ cardKey: "mirror", form: "base", preset: true }),
     ]);
     expect(completedHost.exportError).toBeUndefined();
+    expect(completedHost.export?.averageElixir).toBeNull();
   });
 
   it("presets Mirror outside custom filters and never duplicates it into the offered Mega board", () => {
     const arena = service();
-    const offered = catalog.filter((card) => card.key !== "mirror" && card.kind === "troop" && card.elixir >= 2).slice(0, 16).map((card) => card.key);
+    const offered = catalog.filter((card) => card.key !== "mirror" && card.kind === "troop" && isFixedArenaElixirCost(card.elixir) && card.elixir >= 2).slice(0, 16).map((card) => card.key);
     const pair = createPairWithSettings(arena, {
       mode: "mega",
       mirrorMode: true,

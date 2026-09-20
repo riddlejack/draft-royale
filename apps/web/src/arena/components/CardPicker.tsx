@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import { Check, Search, X } from "lucide-react";
-import { isGroundArenaCard, isRangedArenaCard, type ArenaCard } from "@draft-royale/shared";
+import { isFixedArenaElixirCost, isGroundArenaCard, isRangedArenaCard, type ArenaCard } from "@draft-royale/shared";
 import { ArenaCardFace } from "./ArenaCardFace";
 import "./CardPicker.css";
 
@@ -47,7 +47,7 @@ export function filterPickerCards(cards: readonly ArenaCard[], options: { search
   return cards.filter((card) => (!search || card.name.toLowerCase().includes(search) || card.key.includes(search) || card.families.some((family) => family.includes(search)))
     && (options.kind === "all" || card.kind === options.kind)
     && (options.rarity === "all" || card.rarity === options.rarity)
-    && (options.elixir === null || card.elixir === options.elixir)
+    && (options.elixir === null || (isFixedArenaElixirCost(card.elixir) && card.elixir === options.elixir))
     && [...options.roles].every((role) => matchesRole(card, role)));
 }
 
@@ -84,7 +84,7 @@ export function CardPicker({
   const visible = useMemo(() => filterPickerCards(cards, { search, kind, roles, rarity, elixir })
     .sort((a, b) => showSelectedFirst && selected.has(a.key) !== selected.has(b.key)
       ? selected.has(a.key) ? -1 : 1
-      : a.elixir - b.elixir || a.name.localeCompare(b.name)), [cards, elixir, kind, rarity, roles, search, selected, showSelectedFirst]);
+      : (isFixedArenaElixirCost(a.elixir) ? a.elixir : Number.POSITIVE_INFINITY) - (isFixedArenaElixirCost(b.elixir) ? b.elixir : Number.POSITIVE_INFINITY) || a.name.localeCompare(b.name)), [cards, elixir, kind, rarity, roles, search, selected, showSelectedFirst]);
 
   const toggle = (key: string) => {
     if (disabled.has(key)) return;

@@ -1,5 +1,5 @@
 import type { ArenaCard, ArenaCollection, ArenaForm, DeckDefinition, DeckPair } from "@draft-royale/shared";
-import { buildClashRoyaleDeckLink, collectionOwnsCard, collectionOwnsForm } from "@draft-royale/shared";
+import { buildClashRoyaleDeckLink, collectionOwnsCard, collectionOwnsForm, isFixedArenaElixirCost } from "@draft-royale/shared";
 import { storage } from "../client";
 
 const savedDecksKey = "saved-decks-v1";
@@ -12,9 +12,11 @@ export const writeSavedDecks = (decks: readonly DeckDefinition[], profileId?: st
 
 export function deckElixirLabel(deck: Pick<DeckDefinition, "cards">, catalog: readonly ArenaCard[]) {
   const byKey = new Map(catalog.map((card) => [card.key, card]));
-  const keys = deck.cards.filter((key) => key !== "mirror");
-  const average = keys.length ? keys.reduce((total, key) => total + (byKey.get(key)?.elixir ?? 0), 0) / keys.length : 0;
-  return `${average.toFixed(1)} avg${deck.cards.includes("mirror") ? " · Mirror varies" : ""}`;
+  const costs = deck.cards.map((key) => byKey.get(key)?.elixir);
+  if (costs.some((cost) => cost !== undefined && !isFixedArenaElixirCost(cost))) return "— avg · Mirror varies";
+  const fixed = costs.filter((cost): cost is number => cost !== undefined && isFixedArenaElixirCost(cost));
+  const average = fixed.length ? fixed.reduce((total, cost) => total + cost, 0) / fixed.length : 0;
+  return `${average.toFixed(1)} avg`;
 }
 
 export function deckCollectionIssues(deck: Pick<DeckDefinition, "cards" | "forms">, catalog: readonly ArenaCard[], collection: ArenaCollection): string[] {

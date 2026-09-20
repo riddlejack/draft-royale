@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ArenaCard, DeckDefinition } from "@draft-royale/shared";
-import { clashDeckLink, deckCollectionIssues, deckShareUrl, orderedDeckKeys, parseDeckImport, readSavedDecks, sharedDeckFromLocation } from "./deckUtils";
+import { clashDeckLink, deckCollectionIssues, deckElixirLabel, deckShareUrl, orderedDeckKeys, parseDeckImport, readSavedDecks, sharedDeckFromLocation } from "./deckUtils";
 
 const cards: ArenaCard[] = Array.from({ length: 8 }, (_, index) => ({
   key: `card-${index}`,
@@ -47,6 +47,14 @@ describe("deck workshop utilities", () => {
       "Card 0 is not in My cards.",
       "Hero Card 5 is not unlocked in My cards.",
     ]);
+  });
+
+  it("does not publish a made-up average for a deck with Mirror", () => {
+    const mirror = { ...cards[0]!, key: "mirror", id: 28_000_006, name: "Mirror", elixir: { kind: "previous_card_plus" as const, surcharge: 1 } };
+    const mirrorDeck = { cards: ["mirror", ...cards.slice(1).map((card) => card.key)] };
+    const catalog = [mirror, ...cards.slice(1)];
+    expect(deckElixirLabel(mirrorDeck, catalog)).toBe("— avg · Mirror varies");
+    expect(decodeURIComponent(clashDeckLink(mirrorDeck, new Map(catalog.map((card) => [card.key, card]))))).toContain("copyDeck?deck=28000006");
   });
 
   it("removes a stale pair payload when building a deck share URL", () => {

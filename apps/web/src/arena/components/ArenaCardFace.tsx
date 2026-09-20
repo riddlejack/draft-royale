@@ -1,5 +1,5 @@
 import type { CSSProperties, ImgHTMLAttributes } from "react";
-import type { ArenaCard, ArenaForm } from "@draft-royale/shared";
+import { arenaElixirAccessibleLabel, arenaElixirDisplay, type ArenaCard, type ArenaForm } from "@draft-royale/shared";
 
 const fallbackAsset = (_card: ArenaCard) => "/assets/placeholder-card.svg";
 
@@ -57,7 +57,7 @@ export function ArenaCardFace({
           imageProps?.onError?.(event);
         }}
       />
-      <span className="arena-elixir" aria-label={`${card.elixir} elixir`}><span className="arena-elixir-value" aria-hidden="true">{card.elixir}</span></span>
+      <span className="arena-elixir" aria-label={arenaElixirAccessibleLabel(card.elixir)}><span className="arena-elixir-value" aria-hidden="true">{arenaElixirDisplay(card.elixir)}</span></span>
       {specialForms.length > 0 ? (
         <span className="arena-form-marks" aria-label={`Available forms: ${legalForms.map((key) => formShortLabel[key]).join(", ")}`}>
           {specialForms.slice(0, 2).map((key) => (

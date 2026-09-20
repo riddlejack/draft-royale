@@ -1,4 +1,4 @@
-import type { ArenaCard, ArenaForm } from "./arena.js";
+import { isFixedArenaElixirCost, type ArenaCard, type ArenaForm } from "./arena.js";
 
 export type DeckMode = "2v2" | "classic" | "chaos" | "mirror" | "custom";
 export type DeckVisibility = "private" | "public";
@@ -71,6 +71,7 @@ export function validateDeck(deck: Pick<DeckDefinition, "cards" | "forms">, cata
 
   let elixir = 0;
   let knownCards = 0;
+  let hasVariableElixir = false;
   let evolutions = 0;
   let heroChampions = 0;
   let champions = 0;
@@ -82,7 +83,8 @@ export function validateDeck(deck: Pick<DeckDefinition, "cards" | "forms">, cata
       continue;
     }
     knownCards += 1;
-    elixir += card.elixir;
+    if (isFixedArenaElixirCost(card.elixir)) elixir += card.elixir;
+    else hasVariableElixir = true;
     const form = formForDeckCard(deck, cardKey);
     if (!card.forms.some((candidate) => candidate.key === form)) {
       errors.push(`${card.name} does not support the ${form} form.`);
@@ -101,6 +103,6 @@ export function validateDeck(deck: Pick<DeckDefinition, "cards" | "forms">, cata
   return {
     valid: errors.length === 0,
     errors,
-    averageElixir: knownCards === deck.cards.length && knownCards > 0 ? elixir / knownCards : null,
+    averageElixir: knownCards === deck.cards.length && knownCards > 0 && !hasVariableElixir ? elixir / knownCards : null,
   };
 }

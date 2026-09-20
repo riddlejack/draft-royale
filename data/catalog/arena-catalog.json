@@ -1,6 +1,6 @@
 {
-  "version": "2026-09-05",
-  "updatedAt": "2026-09-05T17:00:00.000Z",
+  "version": "2026-09-20",
+  "updatedAt": "2026-09-20T17:00:00.000Z",
   "cards": [
     {
       "key": "knight",
@@ -529,6 +529,11 @@
         {
           "key": "base",
           "label": "Ice Wizard",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Ice Wizard",
           "asset": "/assets/placeholder-card.svg"
         }
       ]
@@ -1788,6 +1793,24 @@
       ]
     },
     {
+      "key": "minion-giant",
+      "id": 26000107,
+      "name": "Minion Giant",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Minion Giant",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
       "key": "cannon",
       "id": 27000000,
       "name": "Cannon",
@@ -2200,7 +2223,10 @@
       "key": "mirror",
       "id": 28000006,
       "name": "Mirror",
-      "elixir": 1,
+      "elixir": {
+        "kind": "previous_card_plus",
+        "surcharge": 1
+      },
       "rarity": "epic",
       "kind": "spell",
       "families": [

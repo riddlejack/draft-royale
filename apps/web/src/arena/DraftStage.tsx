@@ -8,7 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import type { ArenaCard, ArenaCell, ArenaForm, ArenaPickEvent, ArenaSeat, ArenaView } from "@draft-royale/shared";
+import { arenaElixirAccessibleLabel, type ArenaCard, type ArenaCell, type ArenaForm, type ArenaPickEvent, type ArenaSeat, type ArenaView } from "@draft-royale/shared";
 import { ArenaCardFace, assetForForm } from "./components/ArenaCardFace";
 import { CountdownBar } from "./components/CountdownBar";
 import { DeckTray } from "./components/DeckTray";
@@ -375,8 +375,8 @@ export function DraftStage({ room, cards, pending, onPick, onLeave, soundEnabled
         onClick={() => card && !opponentChoice && activateCell(cell, card)}
         aria-label={card
           ? opponentChoice
-            ? `${opponent?.name ?? "Opponent"} can choose ${card.name}, ${card.elixir} elixir`
-            : `${card.name}, ${card.elixir} elixir${selected ? ", already selected" : cell.legalForms.length > 1 ? ", choose form" : ""}`
+            ? `${opponent?.name ?? "Opponent"} can choose ${card.name}, ${arenaElixirAccessibleLabel(card.elixir)}`
+            : `${card.name}, ${arenaElixirAccessibleLabel(card.elixir)}${selected ? ", already selected" : cell.legalForms.length > 1 ? ", choose form" : ""}`
           : "Hidden card"}
       >
         {card ? (

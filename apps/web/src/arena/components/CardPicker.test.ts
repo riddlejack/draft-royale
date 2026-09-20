@@ -33,4 +33,10 @@ describe("CardPicker filters", () => {
     expect(filterPickerCards(cards, { search: "fire", kind: "spell", roles: new Set(), rarity: "rare", elixir: 4 }).map((item) => item.key)).toEqual(["fireball"]);
     expect(JSON.stringify(cards)).toBe(before);
   });
+
+  it("excludes a variable-cost card from a numeric elixir selection", () => {
+    const mirror = card("mirror", { id: 28_000_006, elixir: { kind: "previous_card_plus", surcharge: 1 } });
+    expect(filterPickerCards([...cards, mirror], { search: "", kind: "all", roles: new Set(), rarity: "all", elixir: 1 })).not.toContain(mirror);
+    expect(filterPickerCards([...cards, mirror], { search: "", kind: "all", roles: new Set(), rarity: "all", elixir: null })).toContain(mirror);
+  });
 });

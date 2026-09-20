@@ -7,6 +7,7 @@ import {
   DEFAULT_ARENA_SETTINGS,
   effectiveMegaPoolSize,
   filterArenaCards,
+  isFixedArenaElixirCost,
   isChaosInfiniteElixirBattleMode,
   isChaosInfiniteElixirSupportedCard,
   ARENA_MEGA_MAX_POOL_SIZE,
@@ -1500,7 +1501,9 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
           result.export = {
             url: buildClashRoyaleDeckLink(ids),
             entries: clone(entries),
-            averageElixir: entries.reduce((sum, entry) => sum + (cards.get(entry.cardKey)?.elixir ?? 0), 0) / deckSize,
+            averageElixir: entries.every((entry) => isFixedArenaElixirCost((cards.get(entry.cardKey) as ArenaCard).elixir))
+              ? entries.reduce((sum, entry) => sum + ((cards.get(entry.cardKey) as ArenaCard).elixir as number), 0) / deckSize
+              : null,
           };
         } catch (error) {
           result.exportError = error instanceof Error ? error.message : "The completed deck could not be exported.";

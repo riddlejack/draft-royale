@@ -11,11 +11,23 @@ export const ARENA_MIRROR_CARD_KEY = "mirror";
 /** New non-Chaos Mirror drafts include Mirror, then accept seven shared picks. */
 export const ARENA_MIRROR_PICK_COUNT = 7;
 
+/** A card either has a fixed cost or a cost derived from the card it copies. */
+export type ArenaElixirCost = number | { kind: "previous_card_plus"; surcharge: number };
+
+export const isFixedArenaElixirCost = (cost: ArenaElixirCost): cost is number => typeof cost === "number";
+export const arenaElixirDisplay = (cost: ArenaElixirCost): string => isFixedArenaElixirCost(cost) ? String(cost) : "?";
+export const arenaElixirAccessibleLabel = (cost: ArenaElixirCost): string => isFixedArenaElixirCost(cost)
+  ? `${cost} elixir`
+  : `Previous card +${cost.surcharge} elixir`;
+/** Variable costs do not match a numeric range; use an explicit manual pool override to include one. */
+export const matchesArenaElixirRange = (cost: ArenaElixirCost, min: number, max: number): boolean =>
+  isFixedArenaElixirCost(cost) && cost >= min && cost <= max;
+
 export interface ArenaCard {
   key: string;
   id: number;
   name: string;
-  elixir: number;
+  elixir: ArenaElixirCost;
   rarity: string;
   kind: string;
   families: string[];
@@ -133,7 +145,8 @@ export interface ArenaView {
   events: ArenaPickEvent[];
   roundSchedule?: ArenaRoundKind[];
   currentRound?: ArenaRoundMetadata;
-  export?: { url: string; entries: ArenaEntry[]; averageElixir: number };
+  /** Null when the deck contains a card whose deployment cost is variable. */
+  export?: { url: string; entries: ArenaEntry[]; averageElixir: number | null };
   /** Present instead of export when a preserved completed deck cannot produce a legal copy link. */
   exportError?: string;
 }
@@ -197,7 +210,7 @@ export const filterArenaCardsBeforeOverrides = (cards: readonly ArenaCard[], set
     isArenaCardHardEligible(card, settings) &&
     (includeCards === null || includeCards.has(card.key)) &&
     !excludeCards.has(card.key) &&
-    (!elixirRanges.length || elixirRanges.some(({ min, max }) => card.elixir >= min && card.elixir <= max)) &&
+    (!elixirRanges.length || elixirRanges.some(({ min, max }) => matchesArenaElixirRange(card.elixir, min, max))) &&
     (cardKinds === null || cardKinds.has(card.kind)) &&
     (rarities === null || rarities.has(card.rarity)) &&
     (families === null || card.families.some((family) => families.has(family)))
