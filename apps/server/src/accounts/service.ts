@@ -176,7 +176,7 @@ export function createAccountService(options: AccountServiceOptions) {
     if (row.password_version >= 1) {
       const createdAt = now();
       const migrated = options.social.retirePrimaryCredential(row.profile_id, expectedToken, disabledHashFor(row), "account-session", createdAt + SESSION_TTL_MS);
-      if (migrated) {
+      if (migrated || options.social.hasCredential(row.profile_id, expectedToken)) {
         db.prepare("INSERT OR IGNORE INTO account_sessions(id,profile_id,token_hash,created_at,expires_at,last_used_at) VALUES(?,?,?,?,?,?)")
           .run(`as_legacy_${sha256(row.profile_id).slice(0, 24)}`, row.profile_id, expectedHash, createdAt, createdAt + SESSION_TTL_MS, createdAt);
       }
@@ -265,7 +265,9 @@ export function createAccountService(options: AccountServiceOptions) {
     if (!row || stored.length !== hash.length || !timingSafeEqual(hash, stored)) throw new AccountError(401, "The player name or password is incorrect.", "INVALID_CREDENTIALS");
     if (!row.password_enabled) throw new AccountError(409, "This account uses a connected sign-in provider.", "PASSWORD_NOT_ENABLED");
     if (row.password_version < 1) throw new AccountError(409, "This private legacy account needs a one-time password migration before it can sign in.", "LEGACY_PASSWORD_MIGRATION_REQUIRED");
-    return issueSession(row);
+    const response = issueSession(row);
+    const recovery = db.prepare("SELECT 1 FROM account_recovery WHERE profile_id=?").get(row.profile_id);
+    return recovery ? response : { ...response, recoveryCode: createRecovery(row.profile_id) };
   };
   const register = (input: unknown) => {
     const body = input as Record<string, unknown> | null;
@@ -288,17 +290,17 @@ export function createAccountService(options: AccountServiceOptions) {
     const session = db.prepare("SELECT profile_id FROM account_sessions WHERE token_hash=? AND revoked_at IS NULL").get(tokenHash) as { profile_id: string } | undefined;
     if (!session || session.profile_id !== profileId) throw new AccountError(401, "This session is no longer active.", "INVALID_SESSION");
     const timestamp = now();
+    options.social.revokeCredential(profileId, token);
     db.exec("BEGIN IMMEDIATE;");
     try {
       db.prepare("UPDATE account_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL").run(timestamp, tokenHash);
       db.exec("COMMIT;");
     } catch (error) { db.exec("ROLLBACK;"); throw error; }
-    options.social.revokeCredential(profileId, token);
   };
   const revokeAll = (profileId: string) => {
     const timestamp = now();
-    db.prepare("UPDATE account_sessions SET revoked_at=? WHERE profile_id=? AND revoked_at IS NULL").run(timestamp, profileId);
     options.social.revokeCredentials(profileId, "account-session");
+    db.prepare("UPDATE account_sessions SET revoked_at=? WHERE profile_id=? AND revoked_at IS NULL").run(timestamp, profileId);
   };
   const recover = (input: unknown) => {
     const body = input as Record<string, unknown> | null;
