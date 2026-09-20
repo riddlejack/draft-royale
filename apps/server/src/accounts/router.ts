@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import express from "express";
-import type { CollectionImportService } from "../arena/collection-import.js";
+import { CollectionImportError, type CollectionImportService } from "../arena/collection-import.js";
 import type { SocialService } from "../social/service.js";
 import { AccountError, type AccountService } from "./service.js";
 
@@ -120,6 +120,7 @@ export function createAccountRouter(accounts: AccountService, social: SocialServ
 
   router.use((error: unknown, _request: express.Request, response: express.Response, next: express.NextFunction) => {
     if (error instanceof AccountError) { response.status(error.status).json({ error: error.message, code: error.code }); return; }
+    if (error instanceof CollectionImportError) { response.status(error.status).json({ error: error.message, code: error.code }); return; }
     next(error);
   });
   return router;

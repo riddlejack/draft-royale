@@ -187,6 +187,9 @@ describe("remembered player accounts", () => {
     await request(app).patch("/api/accounts/profile").set(firstBearer).send({ tag: "#P0LYQ" }).expect(200);
     const collection = { cards: ["knight", "archers"], forms: { archers: ["base"] }, source: "manual" };
     await request(app).put("/api/accounts/collection").set(firstBearer).send({ collection }).expect(200);
+    await request(app).post("/api/accounts/collection/import").set(firstBearer).send({}).expect(503, {
+      error: "Automatic collection import is not configured on this server.", code: "API_NOT_CONFIGURED",
+    });
     app.locals.arenaService.close();
 
     app = createArenaApp(options);
