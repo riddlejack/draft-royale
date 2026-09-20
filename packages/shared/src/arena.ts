@@ -54,6 +54,16 @@ export interface ArenaCollection {
   cards: string[] | null;
   forms: Record<string, ArenaForm[]> | null;
   source: "unrestricted" | "manual" | "api";
+  /** Public profile used for the last API import. This does not prove account ownership. */
+  profile?: { tag: string; name: string; fetchedAt: string };
+}
+export interface ArenaCollectionImportResponse {
+  collection: ArenaCollection;
+  fetchedAt: string;
+  expiresAt: string;
+  cached: boolean;
+  stale: boolean;
+  warnings: string[];
 }
 export interface ArenaEntry {
   cardKey: string;
@@ -205,6 +215,17 @@ export const filterArenaCards = (cards: readonly ArenaCard[], settings: ArenaSet
     && !excludedIds.has(card.id)
   );
 };
+
+export const collectionOwnsCard = (collection: ArenaCollection, cardKey: string): boolean =>
+  collection.cards === null || collection.cards.includes(cardKey);
+
+/** Base ownership is implied by the card list; special and Champion forms must be explicit. */
+export const collectionOwnsForm = (collection: ArenaCollection, cardKey: string, form: ArenaForm): boolean =>
+  collectionOwnsCard(collection, cardKey)
+  && (collection.forms === null || form === "base" || collection.forms[cardKey]?.includes(form) === true);
+
+export const collectionAllowedForms = (collection: ArenaCollection, card: ArenaCard): ArenaForm[] =>
+  card.forms.map((form) => form.key).filter((form) => collectionOwnsForm(collection, card.key, form));
 
 /** Resolves Mega's configured upper cap against the currently eligible catalog. */
 export const effectiveMegaPoolSize = (settings: Pick<ArenaSettings, "poolSize">, eligibleCount: number): number => {

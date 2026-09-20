@@ -258,7 +258,18 @@ const sanitizeCollection = (input: unknown, catalogKeys: ReadonlySet<string>): A
   }
 
   const unrestricted = cards === null && ownedForms === null;
-  return { cards, forms: ownedForms, source: unrestricted ? "unrestricted" : "manual" };
+  if (unrestricted) return defaultCollection();
+  if (value.source === "api" && value.profile !== undefined) {
+    const profile = asRecord(value.profile);
+    const tag = requireString(profile.tag, "collection profile tag", 20).toUpperCase();
+    const name = requireString(profile.name, "collection profile name", 80);
+    const fetchedAt = requireString(profile.fetchedAt, "collection profile fetchedAt", 40);
+    if (!/^#[0289PYLQGRJCUV]{3,15}$/.test(tag) || !Number.isFinite(Date.parse(fetchedAt))) {
+      throw new ArenaError(400, "Collection contains invalid API profile metadata", "INVALID_COLLECTION");
+    }
+    return { cards, forms: ownedForms, source: "api", profile: { tag, name, fetchedAt: new Date(fetchedAt).toISOString() } };
+  }
+  return { cards, forms: ownedForms, source: "manual" };
 };
 
 const stringList = (value: unknown, label: string, knownValues: ReadonlySet<string>) => {

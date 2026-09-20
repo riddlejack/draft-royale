@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Copy, ExternalLink, Link2, Pencil, Plus, Search, Swords, Users, X } from "lucide-react";
-import type { ArenaCard, DeckCollection, DeckDefinition, DeckMode, DeckSeedResponse, SocialCredential } from "@draft-royale/shared";
+import type { ArenaCard, ArenaCollection, DeckCollection, DeckDefinition, DeckMode, DeckSeedResponse, SocialCredential } from "@draft-royale/shared";
 import { validateDeck } from "@draft-royale/shared";
 import { ArenaCardFace } from "../components/ArenaCardFace";
 import { DeckEditor } from "./DeckEditor";
@@ -84,7 +84,7 @@ function PairBoard({ decks, cardsByKey, onCopy, onEdit, onRemove }: { decks: [De
   </section>;
 }
 
-export function DeckLibrary({ catalog, onBack, onCopy, credential, onMirror }: { catalog: readonly ArenaCard[]; onBack: () => void; onCopy: (value: string, message: string) => void; credential?: SocialCredential | null; onMirror?: () => void }) {
+export function DeckLibrary({ catalog, collection, onBack, onCopy, credential, onMirror }: { catalog: readonly ArenaCard[]; collection: ArenaCollection; onBack: () => void; onCopy: (value: string, message: string) => void; credential?: SocialCredential | null; onMirror?: () => void }) {
   const sharedDeck = useMemo(sharedDeckFromLocation, []);
   const sharedPair = useMemo(sharedPairFromLocation, []);
   const [collections, setCollections] = useState<DeckCollection[]>([]);
@@ -131,7 +131,7 @@ export function DeckLibrary({ catalog, onBack, onCopy, credential, onMirror }: {
     .filter((deck, index, all) => all.findIndex((candidate) => candidate.id === deck.id) === index)
     .filter((deck) => collectionFilter === "all" || collections.find((item) => item.id === collectionFilter)?.decks?.some((item) => item.id === deck.id))
     .filter((deck) => !search.trim() || `${deck.name} ${deck.description ?? ""} ${(deck.tags ?? []).join(" ")} ${deck.cards.map((key) => cardsByKey.get(key)?.name ?? key).join(" ")}`.toLowerCase().includes(search.trim().toLowerCase())), [savedDecks, search, seededDecks, tab, community, collectionFilter, collections, cardsByKey]);
-  const collection = collectionFilter === "all" ? collections.find((candidate) => candidate.mode === tab) : collections.find((candidate) => candidate.id === collectionFilter);
+  const libraryCollection = collectionFilter === "all" ? collections.find((candidate) => candidate.mode === tab) : collections.find((candidate) => candidate.id === collectionFilter);
 
   const remember = (stored: DeckDefinition, oldId: string) => {
     const next = [stored, ...savedDecks.filter((candidate) => candidate.id !== oldId && candidate.id !== stored.id)];
@@ -175,7 +175,7 @@ export function DeckLibrary({ catalog, onBack, onCopy, credential, onMirror }: {
     ? current.filter((candidate) => candidate.id !== deck.id)
     : [...current.slice(-1), deck]);
 
-  if (editing) return <DeckEditor catalog={catalog} initialDeck={editing} onBack={() => { setEditing(null); clearSharedDeckLocation(); }} onSave={saveDeck} onCopy={onCopy} />;
+  if (editing) return <DeckEditor catalog={catalog} collection={collection} initialDeck={editing} onBack={() => { setEditing(null); clearSharedDeckLocation(); }} onSave={saveDeck} onCopy={onCopy} />;
 
   return <section className="deck-library-screen">
     <header className="deck-workshop-toolbar">
@@ -194,7 +194,7 @@ export function DeckLibrary({ catalog, onBack, onCopy, credential, onMirror }: {
     {tab === "2v2" && pairDecks.length === 2 && <PairBoard decks={pairDecks as [DeckDefinition, DeckDefinition]} cardsByKey={cardsByKey} onCopy={onCopy} onEdit={editDeck} onRemove={(id) => setPairDecks((current) => current.filter((deck) => deck.id !== id))} />}
     {tab === "2v2" && pairDecks.length < 2 && <section className="pair-prompt"><Users size={26} /><div><strong>{pairDecks.length ? "Now choose your teammate’s deck" : "Build a teammate pair"}</strong><span>Select the matching screenshot pair or mix any two standalone 2v2 recommendations.</span></div><b>{pairDecks.length}/2</b></section>}
 
-    <div className="deck-library-section-heading"><div><h2>{tab === "saved" ? "My saved decks" : tab === "community" ? "Friends’ published decks" : collection?.title ?? tabs.find((item) => item.key === tab)?.label}</h2><p>{collection?.description ?? (tab === "saved" ? credential ? "Saved to your player account, ready on any signed-in device." : "Stored on this device and ready to remix." : tab === "community" ? "Decks your friends have shared with the site. Save a copy to make it your own." : "Create the first deck for this library.")}</p></div><span>{availableDecks.length} {availableDecks.length === 1 ? "deck" : "decks"}</span></div>
+    <div className="deck-library-section-heading"><div><h2>{tab === "saved" ? "My saved decks" : tab === "community" ? "Friends’ published decks" : libraryCollection?.title ?? tabs.find((item) => item.key === tab)?.label}</h2><p>{libraryCollection?.description ?? (tab === "saved" ? credential ? "Saved to your player account, ready on any signed-in device." : "Stored on this device and ready to remix." : tab === "community" ? "Decks your friends have shared with the site. Save a copy to make it your own." : "Create the first deck for this library.")}</p></div><span>{availableDecks.length} {availableDecks.length === 1 ? "deck" : "decks"}</span></div>
     <div className="deck-library-list">
       {availableDecks.slice(0, limit).map((deck) => <DeckRow key={deck.id} deck={deck} catalog={catalog} cardsByKey={cardsByKey} pairSelected={tab === "2v2" ? pairDecks.some((candidate) => candidate.id === deck.id) : undefined} onTogglePair={tab === "2v2" ? () => togglePair(deck) : undefined} onEdit={() => editDeck(deck)} onCopy={onCopy} onPublish={tab === "saved" ? () => void publishDeck(deck) : undefined} onRemove={tab === "saved" ? () => void removeDeck(deck) : undefined} busy={busyId === deck.id} />)}
       {availableDecks.length > limit && <button className="deck-new library-load-more" onClick={() => setLimit((current) => current + 24)}>Show 24 more decks</button>}

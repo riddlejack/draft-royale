@@ -1,5 +1,5 @@
-import type { ArenaCard, ArenaForm, DeckDefinition, DeckPair } from "@draft-royale/shared";
-import { buildClashRoyaleDeckLink } from "@draft-royale/shared";
+import type { ArenaCard, ArenaCollection, ArenaForm, DeckDefinition, DeckPair } from "@draft-royale/shared";
+import { buildClashRoyaleDeckLink, collectionOwnsCard, collectionOwnsForm } from "@draft-royale/shared";
 import { storage } from "../client";
 
 const savedDecksKey = "saved-decks-v1";
@@ -15,6 +15,25 @@ export function deckElixirLabel(deck: Pick<DeckDefinition, "cards">, catalog: re
   const keys = deck.cards.filter((key) => key !== "mirror");
   const average = keys.length ? keys.reduce((total, key) => total + (byKey.get(key)?.elixir ?? 0), 0) / keys.length : 0;
   return `${average.toFixed(1)} avg${deck.cards.includes("mirror") ? " · Mirror varies" : ""}`;
+}
+
+export function deckCollectionIssues(deck: Pick<DeckDefinition, "cards" | "forms">, catalog: readonly ArenaCard[], collection: ArenaCollection): string[] {
+  const byKey = new Map(catalog.map((card) => [card.key, card]));
+  const issues: string[] = [];
+  for (const key of deck.cards) {
+    const card = byKey.get(key);
+    if (!card) continue;
+    if (!collectionOwnsCard(collection, key)) {
+      issues.push(`${card.name} is not in My cards.`);
+      continue;
+    }
+    const form = deck.forms?.[key] ?? "base";
+    if (!collectionOwnsForm(collection, key, form)) {
+      const label = card.forms.find((candidate) => candidate.key === form)?.label ?? `${card.name} ${form}`;
+      issues.push(`${label} is not unlocked in My cards.`);
+    }
+  }
+  return issues;
 }
 
 export const createDeckId = () => `local-${typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;

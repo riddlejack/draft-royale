@@ -1,4 +1,4 @@
-import type { ArenaCatalogResponse, ArenaCredential, ArenaSessionResponse, ArenaView } from "@draft-royale/shared";
+import type { ArenaCatalogResponse, ArenaCollectionImportResponse, ArenaCredential, ArenaSessionResponse, ArenaView } from "@draft-royale/shared";
 import { recordArenaClock } from "./clock";
 
 export class ArenaApiError extends Error {
@@ -45,6 +45,7 @@ export const loadRoomCatalog = (credential: ArenaCredential) => arenaRequest<Are
 export const commandId = () => typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const createArenaRoom = (body: unknown) => arenaRequest<ArenaSessionResponse>("/rooms", { body });
 export const joinArenaRoom = (body: unknown) => arenaRequest<ArenaSessionResponse>("/join", { body });
+export const importArenaCollection = (tag: string) => arenaRequest<ArenaCollectionImportResponse>("/collection/import", { body: { tag } });
 
 const isArenaView = (value: unknown, credential: ArenaCredential): value is ArenaView => {
   if (!isObject(value)) return false;

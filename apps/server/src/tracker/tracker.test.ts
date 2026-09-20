@@ -61,6 +61,21 @@ describe("tracker battle normalization and analytics", () => {
     expect(summary.recentGames[0]!.participants[0]!.cards[0]).toMatchObject({ key: "electro-dragon", form: "evolution" });
   });
 
+  it("decodes the current Evo/Hero bit field without labeling Hero as Evo", async () => {
+    const withForms = battle(
+      [{ ...participant(players[0]!, 2), cards: [
+        { id: 1, name: "Evo", evolutionLevel: 1 },
+        { id: 2, name: "Hero", evolutionLevel: 2 },
+        { id: 3, name: "Both", evolutionLevel: 3 },
+      ] }],
+      [participant(players[1]!, 1)],
+    );
+    const service = serviceWithLogs({ a: [withForms] });
+    await service.syncNow();
+    const ownCards = service.getSummary(new Set(["a", "b"])).recentGames[0]!.participants.find((item) => item.profileId === "a")!.cards;
+    expect(ownCards.map((card) => card.form)).toEqual(["evolution", "hero", "heroEvolution"]);
+  });
+
   it("keeps games with missing crown fields unscored instead of fabricating losses", async () => {
     const service = serviceWithLogs({ a: [battle([participant(players[0]!)], [participant(players[1]!)])] });
     await service.syncNow();

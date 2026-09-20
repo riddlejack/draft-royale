@@ -384,8 +384,8 @@ export function ArenaApp() {
       <footer className="home-footer">Draft here. Play in Clash Royale.<small>Independent fan-made companion</small></footer>
     </div>}
 
-    {!room && surface === "decks" && catalog && <DeckLibrary catalog={catalog.cards} credential={social.identity} onBack={() => goTo("home")} onMirror={() => goTo("mirror")} onCopy={(value, message) => void copy(value, message)} />}
-    {!room && surface === "mirror" && catalog && <MirrorRoom catalog={catalog.cards} playerName={name} initialCode={new URL(window.location.href).searchParams.get("mirror") ?? ""} onBack={() => goTo("home")} onCopy={(value, message) => void copy(value, message)} />}
+    {!room && surface === "decks" && catalog && <DeckLibrary catalog={catalog.cards} collection={collection} credential={social.identity} onBack={() => goTo("home")} onMirror={() => goTo("mirror")} onCopy={(value, message) => void copy(value, message)} />}
+    {!room && surface === "mirror" && catalog && <MirrorRoom catalog={catalog.cards} collection={collection} playerName={name} initialCode={new URL(window.location.href).searchParams.get("mirror") ?? ""} onBack={() => goTo("home")} onCopy={(value, message) => void copy(value, message)} />}
     {!room && surface === "stats" && <section className="stats-scene"><header className="scene-toolbar"><button className="icon-button" aria-label="Back to home" onClick={() => goTo("home")}><ChevronLeft /></button><span>Match records</span><AccountButton /></header><StatsBoard credential={social.identity} onSignIn={() => window.dispatchEvent(new Event("draft-royale:sign-in"))} /></section>}
 
     {room?.phase === "waiting" && <div className="room-scene">
@@ -394,7 +394,7 @@ export function ArenaApp() {
       <div className="lobby-players">{(["a", "b"] as const).map((seat) => { const person = room.participants.find((participant) => participant.seat === seat); return <div key={seat} className={`lobby-player ${seat === room.viewer ? "you" : "opponent"}`}><div className="player-shield"><Crown size={29} /></div><strong>{person?.name ?? "Waiting for a friend…"}</strong><span>{person ? person.ready ? "Ready!" : "Getting ready" : "Share the invite below"}</span>{person?.ready && <Check className="ready-check" />}</div>; })}<span className="versus">VS</span></div>
       {!practice && <div className="invite-panel"><span>Room code</span><strong>{room.inviteCode}</strong><button className="royale-button blue" onClick={() => void copy(`${window.location.origin}${window.location.pathname}#join=${encodeURIComponent(room.inviteCode)}`, "Invite copied. Send it to your friend.")}><Copy size={17} /> Copy invite link</button><a className="plain-invite" href={`#join=${room.inviteCode}`} onClick={(event) => event.preventDefault()}>{`${window.location.origin}/#join=${room.inviteCode}`}</a></div>}
       <button className="rules-summary" disabled={room.viewer !== "a"} onClick={() => { setSettings(room.settings); setModal("rules"); }}><Settings2 size={17} /><span>{rulesSummary(room.settings)}</span>{room.viewer === "a" && <span>›</span>}</button>
-      <p className="lobby-collection">Your collection: {collection.source === "unrestricted" ? "all cards and forms" : "your saved selection"} <button onClick={() => setModal("collection")}>Edit</button></p>
+      <p className="lobby-collection">Your collection: {collection.source === "unrestricted" ? "all cards and forms" : collection.source === "api" ? `${collection.profile?.name ?? "API profile"} · public profile import` : "your saved selection"} <button onClick={() => setModal("collection")}>Edit</button></p>
       <button className={`royale-button ${ready ? "blue" : "gold"} full-width`} disabled={pending} onClick={() => void run(() => command("ready", { ready: !ready }))}>{ready ? "Ready — waiting for rival" : "I'm ready"}</button>
     </div>}
 

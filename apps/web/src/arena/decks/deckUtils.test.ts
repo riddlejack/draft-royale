@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ArenaCard, DeckDefinition } from "@draft-royale/shared";
-import { clashDeckLink, deckShareUrl, orderedDeckKeys, parseDeckImport, readSavedDecks, sharedDeckFromLocation } from "./deckUtils";
+import { clashDeckLink, deckCollectionIssues, deckShareUrl, orderedDeckKeys, parseDeckImport, readSavedDecks, sharedDeckFromLocation } from "./deckUtils";
 
 const cards: ArenaCard[] = Array.from({ length: 8 }, (_, index) => ({
   key: `card-${index}`,
@@ -35,6 +35,18 @@ describe("deck workshop utilities", () => {
     const ids = cards.map((card) => card.id).join(";");
     expect(parseDeckImport(`https://link.clashroyale.com/deck/en?deck=${ids}&l=en`, cards)).toEqual(deck.cards);
     expect(parseDeckImport(`https://royaleapi.com/decks/stats/${deck.cards.join(",")}`, cards)).toEqual(deck.cards);
+  });
+
+  it("blocks cards and special forms missing from an imported collection", () => {
+    expect(deckCollectionIssues(deck, cards, {
+      cards: deck.cards.filter((key) => key !== "card-0"),
+      forms: { "card-3": ["evolution"], "card-5": [], "card-7": ["evolution"] },
+      source: "api",
+      profile: { tag: "#P0Y", name: "Known player", fetchedAt: "2026-09-20T12:00:00.000Z" },
+    })).toEqual([
+      "Card 0 is not in My cards.",
+      "Hero Card 5 is not unlocked in My cards.",
+    ]);
   });
 
   it("removes a stale pair payload when building a deck share URL", () => {

@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, Copy, ExternalLink, Link2, Save, Trash2 } from "lucide-react";
-import type { ArenaCard, ArenaForm, DeckDefinition, DeckMode } from "@draft-royale/shared";
-import { validateDeck, isChaosInfiniteElixirSupportedCard } from "@draft-royale/shared";
+import type { ArenaCard, ArenaCollection, ArenaForm, DeckDefinition, DeckMode } from "@draft-royale/shared";
+import { collectionAllowedForms, collectionOwnsCard, collectionOwnsForm, validateDeck, isChaosInfiniteElixirSupportedCard } from "@draft-royale/shared";
 import { ArenaCardFace } from "../components/ArenaCardFace";
 import { CardPicker } from "../components/CardPicker";
-import { clashDeckLink, cloneDeck, deckShareUrl, parseDeckImport, deckElixirLabel } from "./deckUtils";
+import { clashDeckLink, cloneDeck, deckCollectionIssues, deckShareUrl, parseDeckImport, deckElixirLabel } from "./deckUtils";
 
 const modes: Array<{ key: DeckMode; label: string }> = [
   { key: "2v2", label: "2v2" },
@@ -16,6 +16,7 @@ const modes: Array<{ key: DeckMode; label: string }> = [
 
 interface DeckEditorProps {
   catalog: readonly ArenaCard[];
+  collection: ArenaCollection;
   initialDeck: DeckDefinition;
   onBack: () => void;
   onSave: (deck: DeckDefinition) => void | Promise<void>;
@@ -23,7 +24,7 @@ interface DeckEditorProps {
   onCopy: (value: string, message: string) => void;
 }
 
-export function DeckEditor({ catalog, initialDeck, onBack, onSave, onCopy, saveLabel = "Save" }: DeckEditorProps) {
+export function DeckEditor({ catalog, collection, initialDeck, onBack, onSave, onCopy, saveLabel = "Save" }: DeckEditorProps) {
   const [deck, setDeck] = useState(() => cloneDeck(initialDeck));
   const [importValue, setImportValue] = useState("");
   const [importError, setImportError] = useState("");
@@ -31,11 +32,12 @@ export function DeckEditor({ catalog, initialDeck, onBack, onSave, onCopy, saveL
   const [saveError, setSaveError] = useState("");
   const cardsByKey = useMemo(() => new Map(catalog.map((card) => [card.key, card])), [catalog]);
   const validation = useMemo(() => validateDeck(deck, catalog), [catalog, deck]);
+  const collectionIssues = useMemo(() => deckCollectionIssues(deck, catalog, collection), [catalog, collection, deck]);
   const modeError = deck.mode === "mirror" && !deck.cards.includes("mirror") ? "Mirror decks must include Mirror." : deck.mode === "chaos" && deck.cards.some((key) => {
     const card = cardsByKey.get(key);
     return !card || !isChaosInfiniteElixirSupportedCard(card) || (deck.forms?.[key] ?? "base") !== "base";
   }) ? "Chaos Infinite Elixir uses the available base cards only." : "";
-  const valid = validation.valid && !modeError && deck.name.trim().length > 0;
+  const valid = validation.valid && !modeError && collectionIssues.length === 0 && deck.name.trim().length > 0;
   const clashLink = valid ? clashDeckLink(deck, cardsByKey) : "";
   const save = async () => {
     if (!valid || saving) return;
@@ -57,11 +59,13 @@ export function DeckEditor({ catalog, initialDeck, onBack, onSave, onCopy, saveL
   const importDeck = () => {
     const cards = parseDeckImport(importValue, catalog);
     if (!cards) { setImportError("Paste a valid Clash deck link, RoyaleAPI stats link, or eight card IDs."); return; }
-    setImportError("");
     const forms = Object.fromEntries(cards.map((key) => {
       const card = cardsByKey.get(key);
       return [key, card?.forms.some((candidate) => candidate.key === "base") ? "base" : card?.forms[0]?.key ?? "base"];
     })) as Record<string, ArenaForm>;
+    const issues = deckCollectionIssues({ cards, forms }, catalog, collection);
+    if (issues.length) { setImportError(`That deck uses unavailable cards: ${issues.slice(0, 3).join(" ")}`); return; }
+    setImportError("");
     setDeck((current) => ({ ...current, cards, forms }));
   };
 
@@ -88,15 +92,16 @@ export function DeckEditor({ catalog, initialDeck, onBack, onSave, onCopy, saveL
               const card = key ? cardsByKey.get(key) : null;
               if (!key || !card) return <div className="deck-slot-empty" key={index}><strong>{index + 1}</strong><span>Choose card</span></div>;
               const form = deck.forms?.[key] ?? "base";
+              const legalForms = collectionAllowedForms(collection, card);
               return <article className={`deck-slot is-${form}`} key={key}>
                 <button type="button" className="deck-slot-remove" onClick={() => setCards(deck.cards.filter((candidate) => candidate !== key))} aria-label={`Remove ${card.name}`}><Trash2 size={13} /></button>
-                <ArenaCardFace card={card} form={form} legalForms={card.forms.map((candidate) => candidate.key)} />
+                <ArenaCardFace card={card} form={form} legalForms={legalForms} />
                 <strong>{card.name}</strong>
-                <select value={form} aria-label={`${card.name} form`} onChange={(event) => setForm(key, event.target.value as ArenaForm)}>{card.forms.map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.key === "base" ? "Base" : candidate.label.replace(card.name, "").trim() || candidate.key}</option>)}</select>
+                <select value={form} aria-label={`${card.name} form`} onChange={(event) => setForm(key, event.target.value as ArenaForm)}>{card.forms.map((candidate) => <option key={candidate.key} value={candidate.key} disabled={!collectionOwnsForm(collection, key, candidate.key)}>{candidate.key === "base" ? "Base" : candidate.label.replace(card.name, "").trim() || candidate.key}{collectionOwnsForm(collection, key, candidate.key) ? "" : " · not owned"}</option>)}</select>
               </article>;
             })}
           </div>
-          <div className={`deck-validity ${valid ? "is-valid" : "is-invalid"}`} role="status">{valid ? <><Check size={15} /> Ready to play and share.</> : validation.errors[0] ?? (modeError || "Give this deck a name.")}</div>
+          <div className={`deck-validity ${valid ? "is-valid" : "is-invalid"}`} role="status">{valid ? <><Check size={15} /> Ready to play and share.</> : collectionIssues[0] ?? validation.errors[0] ?? (modeError || "Give this deck a name.")}</div>
           {saveError && <p className="deck-save-error" role="alert">{saveError}</p>}
           <div className="deck-editor-actions">
             <button type="button" className="deck-action-secondary" onClick={() => setCards([])}>Clear</button>
@@ -114,7 +119,7 @@ export function DeckEditor({ catalog, initialDeck, onBack, onSave, onCopy, saveL
       </div>
 
       <aside className="deck-editor-picker">
-        <CardPicker cards={catalog} selectedKeys={deck.cards} onSelectedKeysChange={setCards} maxSelected={8} title="Add cards" selectionLabel="cards" disabledKeys={deck.mode === "chaos" ? catalog.filter((card) => !isChaosInfiniteElixirSupportedCard(card)).map((card) => card.key) : []} />
+        <CardPicker cards={catalog} selectedKeys={deck.cards} onSelectedKeysChange={setCards} maxSelected={8} title="Add cards" selectionLabel="cards" disabledKeys={catalog.filter((card) => !collectionOwnsCard(collection, card.key) || (deck.mode === "chaos" && !isChaosInfiniteElixirSupportedCard(card))).map((card) => card.key)} />
       </aside>
     </div>
   </section>;

@@ -141,8 +141,11 @@ const normalizeBattleTime = (value: unknown, fallbackMs: number) => {
 };
 
 const parseCardForm = (card: UnknownRecord): TrackerCardForm => {
-  const evolution = (finite(card.evolutionLevel) ?? 0) > 0 || card.isEvolution === true;
-  const hero = (finite(card.heroLevel) ?? 0) > 0 || card.isHero === true;
+  // In current battle payloads evolutionLevel is a bit field: 1 = Evo, 2 = Hero.
+  // Keep the legacy explicit fields as fallbacks, but never treat bit 2 as Evo.
+  const formBits = integer(card.evolutionLevel) ?? 0;
+  const evolution = (formBits & 1) === 1 || card.isEvolution === true;
+  const hero = (formBits & 2) === 2 || (finite(card.heroLevel) ?? 0) > 0 || card.isHero === true;
   if (evolution && hero) return "heroEvolution";
   if (evolution) return "evolution";
   if (hero) return "hero";

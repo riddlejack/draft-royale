@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Copy, ExternalLink, Pencil, Shuffle, Users } from "lucide-react";
-import type { ArenaCard, DeckDefinition, MirrorPlaylistKey, MirrorRoomCommand, MirrorRoomCredential, MirrorRoomView } from "@draft-royale/shared";
+import type { ArenaCard, ArenaCollection, DeckDefinition, MirrorPlaylistKey, MirrorRoomCommand, MirrorRoomCredential, MirrorRoomView } from "@draft-royale/shared";
 import { ArenaCardFace } from "../../components/ArenaCardFace";
 import { DeckEditor } from "../DeckEditor";
 import { clashDeckLink, deckElixirLabel } from "../deckUtils";
@@ -14,6 +14,7 @@ type PendingMirrorCommand =
 
 interface MirrorRoomProps {
   catalog: readonly ArenaCard[];
+  collection: ArenaCollection;
   playerName: string;
   initialCode?: string;
   onBack: () => void;
@@ -22,7 +23,7 @@ interface MirrorRoomProps {
 
 const messageOf = (error: unknown) => error instanceof Error ? error.message : "Mirror room unavailable.";
 
-export function MirrorRoom({ catalog, playerName, initialCode = "", onBack, onCopy }: MirrorRoomProps) {
+export function MirrorRoom({ catalog, collection, playerName, initialCode = "", onBack, onCopy }: MirrorRoomProps) {
   const [credential, setCredential] = useState<MirrorRoomCredential | null>(readMirrorCredential);
   const [room, setRoom] = useState<MirrorRoomView | null>(null);
   const [name, setName] = useState(playerName || "Player");
@@ -81,7 +82,7 @@ export function MirrorRoom({ catalog, playerName, initialCode = "", onBack, onCo
   };
   const leave = () => { writeMirrorCredential(null); setCredential(null); setRoom(null); setEditing(null); };
 
-  if (editing && room) return <DeckEditor catalog={catalog} initialDeck={editing} onBack={() => setEditing(null)} onCopy={onCopy} saveLabel="Update shared deck" onSave={async (deck) => {
+  if (editing && room) return <DeckEditor catalog={catalog} collection={collection} initialDeck={editing} onBack={() => setEditing(null)} onCopy={onCopy} saveLabel="Update shared deck" onSave={async (deck) => {
     // Let DeckEditor own the pending/error state. A revision conflict stays visible in
     // the editor; polling refreshes roomRef so a deliberate second save uses the latest revision.
     await command({ action: "edit", deck });

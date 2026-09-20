@@ -14,9 +14,13 @@ import { createMirrorRoomService, buildMirrorRemixCandidates } from "../mirror/s
 import { createMirrorRoomRouter } from "../mirror/router.js";
 import { createTrackerService } from "../tracker/service.js";
 import { createTrackerRouter } from "../tracker/router.js";
+import { createCollectionImportService } from "./collection-import.js";
+import { createCollectionImportRouter } from "./collection-import-router.js";
 
 export * from "./service.js";
 export * from "./router.js";
+export * from "./collection-import.js";
+export * from "./collection-import-router.js";
 
 export const createArenaApp = (options: ArenaServiceOptions): Express => {
   const app = express();
@@ -34,6 +38,7 @@ export const createArenaApp = (options: ArenaServiceOptions): Express => {
   const librarySeeds = () => { const seeds = deckSeeds(); return { ...seeds, collections: [...seeds.collections, { id: "mirror-remixes", title: "Mirror remixes", mode: "mirror", description: "Every deck contains Mirror. Generated from library recipes; these are custom remixes, not Supercell’s official event pool.", decks: buildMirrorRemixCandidates(allLibraryDecks(), options.catalog).map((candidate) => candidate.deck) }] }; };
   const mirrorRoomService = createMirrorRoomService({ catalog: options.catalog, databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"), getDecks: allLibraryDecks });
   const trackerService = createTrackerService({ databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"), getPlayers: () => accountService.list(), apiToken: process.env.CLASH_ROYALE_API_TOKEN, apiBaseUrl: process.env.CLASH_ROYALE_API_BASE_URL });
+  const collectionImportService = createCollectionImportService({ catalog: options.catalog, apiToken: process.env.CLASH_ROYALE_API_TOKEN, apiBaseUrl: process.env.CLASH_ROYALE_API_BASE_URL, now: options.now });
   const closeArena = service.close.bind(service);
   service.close = () => {
     try {
@@ -52,6 +57,7 @@ export const createArenaApp = (options: ArenaServiceOptions): Express => {
   app.use(createAccountRouter(accountService, socialService));
   app.use(createMirrorRoomRouter(mirrorRoomService));
   app.use(createTrackerRouter(trackerService, socialService));
+  app.use(createCollectionImportRouter(collectionImportService));
   app.use(createArenaRouter(service));
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
     if (error instanceof SocialError) {
@@ -79,5 +85,6 @@ export const createArenaApp = (options: ArenaServiceOptions): Express => {
   app.locals.accountService = accountService;
   app.locals.mirrorRoomService = mirrorRoomService;
   app.locals.trackerService = trackerService;
+  app.locals.collectionImportService = collectionImportService;
   return app;
 };
