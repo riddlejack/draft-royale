@@ -1,11 +1,14 @@
 export type TrackerBattleSource = "api" | "manual";
 export type TrackerBattleResult = "win" | "loss" | "draw" | "unknown";
+export type TrackerBattleUnit = "match" | "duel_round";
 export type TrackerCardForm = "base" | "evolution" | "hero" | "heroEvolution" | "champion";
+export type TrackerRelationship = "all" | "versus" | "alongside";
 
 export interface TrackerPlayer {
-  profileId: string;
-  displayName: string;
   tag: string;
+  displayName: string;
+  linkedProfileIds: string[];
+  activeProfileIds: string[];
 }
 
 export interface TrackerCard {
@@ -17,6 +20,7 @@ export interface TrackerCard {
 }
 
 export interface TrackerParticipant {
+  /** Present only for manual results so social identity survives a later tag change. */
   profileId: string | null;
   tag: string;
   name: string;
@@ -27,13 +31,21 @@ export interface TrackerParticipant {
   cards: TrackerCard[];
 }
 
+export interface TrackerBattleProvenance {
+  kind: "server_fetch" | "operator_snapshot" | "user_import" | "manual";
+  label: string;
+  observedAt: number;
+}
+
 export interface TrackerBattle {
   id: string;
   battleTime: string;
   type: string;
   mode: { id: number | null; name: string };
   source: TrackerBattleSource;
+  unit: TrackerBattleUnit;
   fetchedAt: number;
+  provenance: TrackerBattleProvenance;
   participants: TrackerParticipant[];
 }
 
@@ -46,44 +58,53 @@ export interface TrackerTally {
   winRate: number | null;
 }
 
-export interface TrackerPlayerTally extends TrackerTally {
-  profileId: string;
-  displayName: string;
-  tag: string;
-}
+export interface TrackerPlayerTally extends TrackerTally, TrackerPlayer {}
 
 export interface TrackerPairTally extends TrackerTally {
-  leftProfileId: string;
+  leftTag: string;
   leftDisplayName: string;
-  rightProfileId: string;
+  rightTag: string;
   rightDisplayName: string;
 }
 
 export interface TrackerModeTally extends TrackerTally {
-  profileId: string;
+  playerTag: string;
   modeId: number | null;
   modeName: string;
 }
 
 export interface TrackerCardTally extends TrackerTally {
-  profileId: string;
+  playerTag: string;
   card: TrackerCard;
 }
 
 export interface TrackerDeckTally extends TrackerTally {
-  profileId: string;
+  playerTag: string;
   signature: string;
   cards: TrackerCard[];
 }
 
+export interface TrackerDeckMatchupTally extends TrackerTally {
+  playerTag: string;
+  ownSignature: string;
+  ownCards: TrackerCard[];
+  opponentSignature: string;
+  opponentCards: TrackerCard[];
+}
+
 export interface TrackerPollPlayerStatus {
-  profileId: string;
   displayName: string;
   tag: string;
+  subscriberCount: number;
+  trackingStartedAt: number;
   lastAttemptAt: number | null;
   lastSuccessAt: number | null;
+  nextPollAt: number | null;
   lastError: string | null;
   battlesSeen: number;
+  consecutiveFailures: number;
+  idleStreak: number;
+  possibleGapCount: number;
 }
 
 export interface TrackerPollStatus {
@@ -94,7 +115,49 @@ export interface TrackerPollStatus {
   nextPollAt: number | null;
   stale: boolean;
   message: string;
+  requestBudget: {
+    trackedTags: number;
+    quickPollRequestsPerDay: number;
+    maximumIdleRequestsPerDay: number;
+  };
   players: TrackerPollPlayerStatus[];
+}
+
+export interface TrackerCoverageGap {
+  startAt: string;
+  endAt: string;
+  detectedAt: number;
+  reason: "non_overlapping_api_windows";
+}
+
+export interface TrackerCoverage {
+  playerTag: string;
+  trackingStartedAt: number | null;
+  earliestBattleAt: string | null;
+  latestBattleAt: string | null;
+  lastSuccessfulSyncAt: number | null;
+  possibleGaps: TrackerCoverageGap[];
+  sourceCounts: Record<TrackerBattleSource, number>;
+  provenanceCounts: {
+    serverFetch: number;
+    operatorSnapshot: number;
+    userImport: number;
+    manual: number;
+  };
+}
+
+export interface TrackerFilters {
+  playerTag: string;
+  opponentTag: string | null;
+  relationship: TrackerRelationship;
+  mode: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+}
+
+export interface TrackerFilterOptions {
+  players: TrackerPlayer[];
+  modes: Array<{ key: string; name: string }>;
 }
 
 export interface TrackerSummary {
@@ -102,12 +165,19 @@ export interface TrackerSummary {
   scope: "rolling_observations";
   completenessNotice: string;
   poll: TrackerPollStatus;
+  filters: TrackerFilters;
+  filterOptions: TrackerFilterOptions;
+  coverage: TrackerCoverage | null;
+  sample: TrackerTally;
   players: TrackerPlayerTally[];
   headToHead: TrackerPairTally[];
   coPlay: TrackerPairTally[];
   modes: TrackerModeTally[];
   cards: TrackerCardTally[];
   decks: TrackerDeckTally[];
+  opponentCards: TrackerCardTally[];
+  opponentDecks: TrackerDeckTally[];
+  deckMatchups: TrackerDeckMatchupTally[];
   recentGames: TrackerBattle[];
 }
 
@@ -140,4 +210,16 @@ export interface UndoManualTrackerResultResponse {
   battleId: string;
   undone: boolean;
   replayed: boolean;
+}
+
+export interface TrackerImportResult {
+  inputRows: number;
+  validRows: number;
+  uniqueRows: number;
+  insertedRows: number;
+  duplicateRows: number;
+  rejectedRows: number;
+  earliestBattleAt: string | null;
+  latestBattleAt: string | null;
+  provenanceKind: "operator_snapshot" | "user_import";
 }
