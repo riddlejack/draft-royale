@@ -888,6 +888,8 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
     const own = getRegisteredPlayers().find((player) => player.profileId === actorProfileId)?.tag;
     const tag = normalizeTrackerTag(rawTag) || own || "";
     if (!tag || !allowed.has(tag)) throw new TrackerError(403, "That player is outside your visible tracker scope", "TRACKER_FORBIDDEN");
+    const activeInScope = visiblePlayers(visibleProfileIds).find((player) => player.tag === tag)?.activeProfileIds.length;
+    if (!activeInScope) throw new TrackerError(409, "That historical player tag is no longer tracked. Reconnect it in account settings before syncing.", "TRACKING_INACTIVE");
     const last = manualSyncAt.get(tag) ?? 0;
     if (now() - last < MANUAL_SYNC_COOLDOWN_MS) throw new TrackerError(429, "That player was just queued for sync. Try again shortly.", "SYNC_COOLDOWN");
     manualSyncAt.set(tag, now());

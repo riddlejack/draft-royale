@@ -128,8 +128,9 @@ export function StatsBoard({ credential, onSignIn }: StatsBoardProps) {
 
   const opponents = summary.filterOptions.players.filter((player) => player.tag !== summary.filters.playerTag);
   const coverage = summary.coverage;
+  const selectedPlayerIsActive = Boolean(summary.filterOptions.players.find((player) => player.tag === summary.filters.playerTag)?.activeProfileIds.length);
   return <section className="tracker-shell">
-    <header className="tracker-hero"><div><span>RECORDED GAMES</span><h1>Match history</h1><p>{summary.completenessNotice}</p></div><button type="button" className="tracker-refresh" disabled={loading || syncing || !summary.poll.configured} onClick={() => void sync()} aria-label="Sync selected player now"><RefreshCw className={loading || syncing ? "tracker-spin" : ""} size={18} /></button></header>
+    <header className="tracker-hero"><div><span>RECORDED GAMES</span><h1>Match history</h1><p>{summary.completenessNotice}</p></div><button type="button" className="tracker-refresh" disabled={loading || syncing || !summary.poll.configured || !selectedPlayerIsActive} onClick={() => void sync()} aria-label={selectedPlayerIsActive ? "Sync selected player now" : "Historical player tag cannot be synced"} title={selectedPlayerIsActive ? undefined : "Reconnect this tag in account settings to sync it again."}><RefreshCw className={loading || syncing ? "tracker-spin" : ""} size={18} /></button></header>
     <div className={`tracker-sync ${summary.poll.configured ? summary.poll.stale ? "stale" : "live" : "setup"}`}><Clock3 size={16} /><div><strong>{summary.poll.configured ? summary.poll.stale ? "Collection needs attention" : "Automatic collection is on" : "Automatic collection is not configured"}</strong><span>{summary.poll.message} {summary.poll.lastSuccessfulPollAt ? `Last success ${formatWhen(summary.poll.lastSuccessfulPollAt)}.` : ""}</span></div></div>
     {error ? <div className="tracker-error"><ShieldAlert size={16} /><span>{error}</span><button onClick={() => setError(null)} aria-label="Dismiss">×</button></div> : null}
 

@@ -71,14 +71,25 @@ describe("tag-centric collection and migration", () => {
     const oldTag = players[0]!.tag;
     const row = battle([participant(players[0]!, 2)], [participant(players[1]!, 1)]);
     const logs: Record<string, unknown[]> = { [oldTag]: [row], [players[1]!.tag]: [] };
-    const service = serviceWithLogs({ players: () => players, logs });
+    const calls: string[] = [];
+    const service = serviceWithLogs({ players: () => players, logs, calls });
     await service.syncNow();
+    calls.splice(0);
     const newTag = initialPlayers[2]!.tag;
     players = [{ ...players[0]!, tag: newTag }, players[1]!];
     logs[newTag] = [];
     expect(summary(service, "a", ["a"], { playerTag: oldTag }).sample.games).toBe(1);
     expect(summary(service, "a", ["a"], { playerTag: newTag }).sample.games).toBe(0);
     expect(summary(service, "a", ["a"]).filterOptions.players.map((player) => player.tag)).toEqual(expect.arrayContaining([oldTag, newTag]));
+    await expect(service.requestSync("a", new Set(["a"]), oldTag)).rejects.toMatchObject({ status: 409, code: "TRACKING_INACTIVE" });
+    expect(calls).toEqual([]);
+    await service.requestSync("a", new Set(["a"]), newTag);
+    expect(calls).toEqual([newTag]);
+
+    players = players.filter((player) => player.profileId !== "a");
+    expect(summary(service, "a", ["a"], { playerTag: newTag }).filterOptions.players.find((player) => player.tag === newTag)?.activeProfileIds).toEqual([]);
+    await expect(service.requestSync("a", new Set(["a"]), newTag)).rejects.toMatchObject({ status: 409, code: "TRACKING_INACTIVE" });
+    expect(calls).toEqual([newTag]);
   });
 
   it("migrates preexisting participant profile IDs to tag identity without losing history", () => {
