@@ -252,7 +252,7 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
           {error ? <p role="alert" className="club-account-error">{error}</p> : null}
           <button className="text-button club-sign-out" disabled={pending} onClick={() => void signOut()}>Sign out of this device</button>
         </div> : <>
-          {mode === "login" && providers?.google.enabled && providers.google.clientId ? <><GoogleSignIn clientId={providers.google.clientId} onSession={googleSession} onError={setError} /><div className="club-divider"><span>or use your Draft Royale account</span></div></> : null}
+          {mode === "login" && providers?.google.enabled && providers.google.clientId ? <><GoogleSignIn clientId={providers.google.clientId} onSession={googleSession} onError={setError} /><p className="club-account-hint">New here? Google creates your Draft Royale profile. Already have a player-name account? Sign in below once, then connect Google from your account panel.</p><div className="club-divider"><span>or use your Draft Royale account</span></div></> : null}
           <form onSubmit={(event) => { event.preventDefault(); void submitCredentials(); }}>
             <label>Player name<input value={username} maxLength={32} autoComplete="username" onChange={(event) => setUsername(event.target.value)} required /></label>
             {mode === "recover" ? <label>Recovery code<input value={recoveryCode} maxLength={40} autoComplete="off" onChange={(event) => setRecoveryCode(event.target.value.toUpperCase())} placeholder="DR-…" required /></label> : null}
