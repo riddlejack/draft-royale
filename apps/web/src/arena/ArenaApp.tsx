@@ -13,6 +13,8 @@ import { MirrorRoom } from "./decks/mirror/MirrorRoom";
 import { StatsBoard } from "./tracker/StatsBoard";
 import "./workshop-nav.css";
 import { AccountButton, AccountControl } from "./accounts/AccountControl";
+import { collectionDirtyKey, collectionStorageKey, rememberedAccount, saveAccountCollection, type AccountSession, type ClubAccount } from "./accounts/accountClient";
+import { readSocialIdentity } from "./socialClient";
 import "./arena.css";
 
 const modes: { key: ArenaMode; title: string; description: string; cards: string[] }[] = [
@@ -46,7 +48,10 @@ export function ArenaApp() {
     const nativePrivate = saved.mode !== undefined && saved.mode !== "mega";
     return { ...DEFAULT_ARENA_SETTINGS, ...saved, poolSize: Math.min(saved.poolSize ?? DEFAULT_ARENA_SETTINGS.poolSize, ARENA_MEGA_MAX_POOL_SIZE), timerMode: saved.timerMode ?? (nativePrivate ? "whole_draft" : "per_pick"), pickSeconds: nativePrivate && !saved.timerMode ? 60 : saved.pickSeconds ?? 15 };
   });
-  const [collection, setCollection] = useState<ArenaCollection>(() => storage.get("collection", ALL_CARDS));
+  const [collection, setCollection] = useState<ArenaCollection>(() => {
+    const account = rememberedAccount();
+    return account ? storage.get(collectionStorageKey(account.profileId), ALL_CARDS) : storage.get("collection", ALL_CARDS);
+  });
   const [credential, setCredential] = useState<ArenaCredential | null>(null);
   const [room, setRoom] = useState<ArenaView | null>(null);
   const roomRef = useRef<ArenaView | null>(null);
@@ -65,6 +70,40 @@ export function ArenaApp() {
   const [sound, setSound] = useState(() => storage.get("sound", false));
   const [surface, setSurface] = useState<AppSurface>(surfaceFromLocation);
   const social = useSocial(name);
+  const applyAccountSession = useCallback((session: AccountSession) => {
+    const scopedKey = collectionStorageKey(session.account.profileId);
+    const local = storage.get<ArenaCollection>(scopedKey, ALL_CARDS);
+    const dirty = storage.get(collectionDirtyKey(session.account.profileId), false);
+    const next = dirty ? local : session.collection ?? local;
+    setName(session.account.displayName);
+    setCollection(next);
+    storage.set("name", session.account.displayName);
+    storage.set(scopedKey, next);
+    if (dirty) {
+      const identity = readSocialIdentity();
+      if (identity?.profileId === session.account.profileId) void saveAccountCollection(identity.token, local)
+        .then(() => storage.set(collectionDirtyKey(session.account.profileId), false)).catch(() => undefined);
+    }
+  }, []);
+  const applyImportedCollection = useCallback((next: ArenaCollection, account: ClubAccount) => {
+    setCollection(next);
+    storage.set(collectionStorageKey(account.profileId), next);
+    storage.set(collectionDirtyKey(account.profileId), false);
+  }, []);
+  const persistCollection = useCallback(async (next: ArenaCollection) => {
+    setCollection(next);
+    const account = rememberedAccount();
+    const identity = readSocialIdentity();
+    if (!account || identity?.profileId !== account.profileId) { storage.set("collection", next); return; }
+    storage.set(collectionStorageKey(account.profileId), next);
+    storage.set(collectionDirtyKey(account.profileId), true);
+    try {
+      await saveAccountCollection(identity.token, next);
+      storage.set(collectionDirtyKey(account.profileId), false);
+    } catch (failure) {
+      throw new Error(`${messageOf(failure)} Your correction is still saved on this device and will retry after sign-in.`);
+    }
+  }, []);
   const goTo = (next: AppSurface) => {
     navigationEpoch.current += 1;
     const url = new URL(window.location.href);
@@ -371,7 +410,7 @@ export function ArenaApp() {
       <header className="home-toolbar"><button className="icon-button" aria-label={sound ? "Turn sound off" : "Turn sound on"} onClick={() => { setSound(!sound); storage.set("sound", !sound); }}>{sound ? <Volume2 size={21} /> : <VolumeX size={21} />}</button><div className="scene-toolbar-actions"><AccountButton />{socialButton}<button className="small-button" onClick={() => setModal("collection")}><Shield size={16} /> My cards</button></div></header>
       <div className="royale-brand"><Crown className="brand-crown" size={50} strokeWidth={2.5} /><h1><span>DRAFT</span><span>ROYALE</span></h1><p>Your rules. Your rival. Your battle.</p></div>
       <div className="home-content">
-        <nav className="home-feature-nav" aria-label="Play and build"><button onClick={() => goTo("decks")}>Deck library</button><button onClick={() => goTo("mirror")}>Mirror roulette</button><button onClick={() => goTo("stats")}>Match records</button></nav>
+        <nav className="home-feature-nav" aria-label="Play and build"><button onClick={() => goTo("decks")}>Deck library</button><button onClick={() => goTo("mirror")}>Same-deck battle</button><button onClick={() => goTo("stats")}>Match records</button></nav>
         <div className="mode-picker" role="group" aria-label="Draft mode">{modes.map((mode) => <button key={mode.key} className={`mode-card ${settings.mode === mode.key ? "selected" : ""}`} aria-pressed={settings.mode === mode.key} onClick={() => { const next: ArenaSettings = { ...settings, mode: mode.key, timerMode: mode.key === "mega" ? "per_pick" : "whole_draft", pickSeconds: mode.key === "mega" ? 15 : 60, groupedSpecialRounds: mode.key === "triple" ? settings.groupedSpecialRounds : false }; setSettings(next); storage.set("settings", next); }}>
           <div className="mode-art" aria-hidden="true">{mode.cards.map((key, index) => <img src={cardsByKey.get(key)?.forms[0]?.asset ?? `/assets/placeholder-card.svg`} key={key} alt="" style={{ "--fan-index": index, "--fan-total": mode.cards.length } as React.CSSProperties} />)}</div>
           <div className="mode-copy"><strong>{mode.title}</strong><span>{mode.description}</span></div>{settings.mode === mode.key && <span className="mode-selected"><Check size={16} /></span>}
@@ -419,10 +458,10 @@ export function ArenaApp() {
     {error && <div className="error-toast" role="alert"><span>{error}</span><button onClick={() => setError("")} aria-label="Dismiss error">×</button></div>}
     {notice && <div className="notice-toast" role="status">{notice}</div>}
     {modal === "rules" && <SettingsEditor cards={cards} value={room?.settings ?? settings} onClose={() => setModal(null)} onSave={(next) => { if (room) { void run(async () => { await command("settings", { settings: { ...next, elixirRanges: next.elixirRanges ?? null, minElixir: next.minElixir ?? null, maxElixir: next.maxElixir ?? null, includeCards: next.includeCards ?? null, excludeCards: next.excludeCards ?? null, includedCardIds: next.includedCardIds ?? null, excludedCardIds: next.excludedCardIds ?? null, cardKinds: next.cardKinds ?? null, rarities: next.rarities ?? null, families: next.families ?? null } }); setModal(null); }); } else { setSettings(next); storage.set("settings", next); setModal(null); } }} />}
-    {modal === "collection" && <CollectionEditor cards={cards} value={collection} onClose={() => setModal(null)} onSave={(next) => { void run(async () => { if (room?.phase === "waiting") await command("collection", { collection: next }); setCollection(next); storage.set("collection", next); setModal(null); }); }} />}
+    {modal === "collection" && <CollectionEditor cards={cards} value={collection} onClose={() => setModal(null)} onSave={(next) => { void run(async () => { if (room?.phase === "waiting") await command("collection", { collection: next }); await persistCollection(next); setModal(null); }); }} />}
     {modal === "social" && room?.phase !== "drafting" && <SocialPanel social={social} name={name} onNameChange={(next) => { setName(next); storage.set("name", next); }} settings={room?.settings ?? settings} collection={collection} friendToken={friendToken} onFriendTokenChange={(token) => { setFriendToken(token); if (!token) { const query = new URLSearchParams(window.location.hash.slice(1)); if (query.has("friend")) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`); } }} onAcceptInvite={(inviteId) => openSocialInvite(inviteId, true)} onOpenInvite={(inviteId) => openSocialInvite(inviteId, false)} onLegacyInvite={() => { setModal(null); void start(false); }} onClose={closeSocial} onCopy={copy} />}
     {modal === "join" && <div className="arena-modal-backdrop" onClick={() => { navigationEpoch.current += 1; setModal(null); }}><form className="arena-modal join-modal" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); const expectedNavigation = ++navigationEpoch.current; storage.set("name", name.trim() || "Player"); void run(async () => { const session = await joinArenaRoom({ inviteCode: invite.trim().toUpperCase(), name: name.trim() || "Player", collection }); if (navigationEpoch.current === expectedNavigation) openSession(session); }); }}><header className="modal-heading"><h2>Join your friend</h2><button type="button" className="icon-button" onClick={() => { navigationEpoch.current += 1; setModal(null); }} aria-label="Close join">×</button></header><label>Your name<input value={name} maxLength={24} onChange={(event) => setName(event.target.value)} autoComplete="nickname" /></label><label>Room code<input className="code-input" value={invite} onChange={(event) => setInvite(event.target.value.toUpperCase())} maxLength={12} placeholder="ABC123" autoCapitalize="characters" autoComplete="off" required /></label><button className="royale-button gold full-width" disabled={pending || !invite.trim()}>Enter battle room</button><button className="text-button" type="button" onClick={() => setModal("collection")}>Check my collection</button></form></div>}
     <footer className="unofficial-notice">This material is unofficial and is not endorsed by Supercell.</footer>
-    <AccountControl hideTrigger />
+    <AccountControl hideTrigger onSession={applyAccountSession} onCollection={applyImportedCollection} />
   </main>;
 }

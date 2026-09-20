@@ -24,23 +24,36 @@ describe("remembered player accounts", () => {
     expect(() => accounts.register({ displayName: "NewFriend", tag: "#P0LYQ", password: "NewFriend" })).toThrow(/12–128/);
     const first = accounts.register({ displayName: "NewFriend", tag: "#P0LYQ", password: "correct horse battery" });
     expect(first.account.tag).toBe("#P0LYQ");
+    expect(first.recoveryCode).toMatch(/^DR-(?:[A-F0-9]{4}-){5}[A-F0-9]{4}$/);
     expect(first.state.friends).toEqual([]);
     expect(() => accounts.login({ username: "NewFriend", password: "wrong password value" })).toThrow("incorrect");
     app.locals.arenaService.close();
     const restored = createArenaApp(options);
     cleanup.push(() => restored.locals.arenaService.close());
     const second = (restored.locals.accountService as AccountService).login({ username: "newfriend", password: "correct horse battery" });
-    expect(second.credential).toEqual(first.credential);
+    expect(second.credential.profileId).toBe(first.credential.profileId);
+    expect(second.credential.token).not.toBe(first.credential.token);
     expect(second.state.friends).toHaveLength(0);
   });
-  it("allows another player while protecting existing names and tags", () => {
+  it("allows separate accounts to track the same public tag while keeping sessions and resources profile-scoped", async () => {
     const app = createArenaApp({ catalog, catalogVersion: "test", databasePath: ":memory:" });
     cleanup.push(() => app.locals.arenaService.close());
     const accounts = app.locals.accountService as AccountService;
-    const result = accounts.register({ displayName: "NewFriend", tag: "#P0LYQ", password: "a secure local password" });
-    expect(result.account.displayName).toBe("NewFriend");
-    expect(accounts.login({ username: "NewFriend", password: "a secure local password" }).credential).toEqual(result.credential);
-    expect(() => accounts.register({ displayName: "Someone", tag: "#P0LYQ", password: "another secure password" })).toThrow("already has an account");
+    const first = accounts.register({ displayName: "NewFriend", tag: "#P0LYQ", password: "a secure local password" });
+    const second = accounts.register({ displayName: "Someone", tag: "#P0LYQ", password: "another secure password" });
+    expect(first.account.tag).toBe(second.account.tag);
+    expect(first.account.profileId).not.toBe(second.account.profileId);
+    expect(accounts.login({ username: "NewFriend", password: "a secure local password" }).credential.profileId).toBe(first.account.profileId);
+    const firstBearer = { Authorization: `Bearer ${first.credential.token}` };
+    const secondBearer = { Authorization: `Bearer ${second.credential.token}` };
+    await request(app).post("/api/decks").set(firstBearer).send({
+      commandId: "private-first", deck: { id: "first", name: "First private", mode: "classic", cards: ["hog-rider", "musketeer", "ice-golem", "skeletons", "ice-spirit", "cannon", "fireball", "the-log"] },
+    }).expect(201);
+    expect((await request(app).get("/api/decks/mine").set(firstBearer).expect(200)).body.decks).toHaveLength(1);
+    expect((await request(app).get("/api/decks/mine").set(secondBearer).expect(200)).body.decks).toHaveLength(0);
+    await request(app).post("/api/accounts/logout").set(firstBearer).expect(200);
+    await request(app).get("/api/accounts/session").set(firstBearer).expect(401);
+    await request(app).get("/api/accounts/session").set(secondBearer).expect(200);
   });
   it("does not expose the account roster over HTTP", async () => {
     const app = createArenaApp({ catalog, catalogVersion: "test", databasePath: ":memory:" });
@@ -107,16 +120,80 @@ describe("remembered player accounts", () => {
     accounts = app.locals.accountService as AccountService;
     expect(() => accounts.login({ username: "LegacyPlayer", password: "temporary secure pass" })).toThrow("incorrect");
     const migrated = accounts.login({ username: "LegacyPlayer", password: migratedPassword });
-    expect(migrated.credential).toEqual({ profileId: legacy.account.profileId, token: migratedToken });
+    expect(migrated.credential.profileId).toBe(legacy.account.profileId);
+    expect(migrated.credential.token).not.toBe(migratedToken);
     await request(app).get("/api/accounts/session").set(oldBearer).expect(401);
-    expect((await request(app).get("/api/social/state").set({ Authorization: `Bearer ${migratedToken}` }).expect(200)).body.state.friends).toHaveLength(1);
-    expect((await request(app).get("/api/decks/mine").set({ Authorization: `Bearer ${migratedToken}` }).expect(200)).body.decks).toEqual([expect.objectContaining({ name: "Preserved deck" })]);
-    expect((await request(app).get("/api/tracker/summary").set({ Authorization: `Bearer ${migratedToken}` }).expect(200)).body.summary.recentGames).toHaveLength(1);
+    const migratedBearer = { Authorization: `Bearer ${migrated.credential.token}` };
+    expect((await request(app).get("/api/social/state").set(migratedBearer).expect(200)).body.state.friends).toHaveLength(1);
+    expect((await request(app).get("/api/decks/mine").set(migratedBearer).expect(200)).body.decks).toEqual([expect.objectContaining({ name: "Preserved deck" })]);
+    expect((await request(app).get("/api/tracker/summary").set(migratedBearer).expect(200)).body.summary.recentGames).toHaveLength(1);
     app.locals.arenaService.close();
 
     app = createArenaApp(options);
     cleanup.push(() => app.locals.arenaService.close());
-    expect((app.locals.accountService as AccountService).login({ username: "LegacyPlayer", password: migratedPassword }).credential.token).toBe(migratedToken);
+    expect((app.locals.accountService as AccountService).login({ username: "LegacyPlayer", password: migratedPassword }).credential.profileId).toBe(legacy.account.profileId);
     await request(app).get("/api/social/state").set(oldBearer).expect(401);
+  });
+
+  it("persists account-owned collections and uses one-time recovery to revoke every older session", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "draft-account-recovery-"));
+    cleanup.push(() => rmSync(dir, { recursive: true, force: true }));
+    const options = { catalog, catalogVersion: "test", databasePath: path.join(dir, "test.sqlite") };
+    let app = createArenaApp(options);
+    const registered = (app.locals.accountService as AccountService).register({ displayName: "Recoverable", password: "first durable password" });
+    const firstBearer = { Authorization: `Bearer ${registered.credential.token}` };
+    const second = (app.locals.accountService as AccountService).login({ username: "Recoverable", password: "first durable password" });
+    const secondBearer = { Authorization: `Bearer ${second.credential.token}` };
+    await request(app).patch("/api/accounts/profile").set(firstBearer).send({ tag: "#P0LYQ" }).expect(200);
+    const collection = { cards: ["knight", "archers"], forms: { archers: ["base"] }, source: "manual" };
+    await request(app).put("/api/accounts/collection").set(firstBearer).send({ collection }).expect(200);
+    app.locals.arenaService.close();
+
+    app = createArenaApp(options);
+    cleanup.push(() => app.locals.arenaService.close());
+    expect((await request(app).get("/api/accounts/session").set(firstBearer).expect(200)).body).toMatchObject({
+      account: { tag: "#P0LYQ", profileId: registered.account.profileId }, collection,
+    });
+    const recovered = await request(app).post("/api/accounts/recover").send({
+      username: "Recoverable", recoveryCode: registered.recoveryCode, newPassword: "replacement durable password",
+    }).expect(200);
+    expect(recovered.body.recoveryCode).toMatch(/^DR-/);
+    expect(recovered.body.recoveryCode).not.toBe(registered.recoveryCode);
+    await request(app).get("/api/accounts/session").set(firstBearer).expect(401);
+    await request(app).get("/api/accounts/session").set(secondBearer).expect(401);
+    await request(app).get("/api/accounts/session").set({ Authorization: `Bearer ${recovered.body.credential.token}` }).expect(200);
+    await request(app).post("/api/accounts/recover").send({
+      username: "Recoverable", recoveryCode: registered.recoveryCode, newPassword: "another durable password",
+    }).expect(401);
+  });
+
+  it("keeps Google disabled without operator configuration and validates nonce, issuer, audience, expiry, and safe linking when configured", async () => {
+    const disabled = createArenaApp({ catalog, catalogVersion: "test", databasePath: ":memory:" });
+    cleanup.push(() => disabled.locals.arenaService.close());
+    expect((await request(disabled).get("/api/accounts/providers").expect(200)).body.google).toEqual({ enabled: false });
+    await request(disabled).post("/api/accounts/google/challenge").send({}).expect(503);
+
+    let nonce = "";
+    const app = createArenaApp({
+      catalog, catalogVersion: "test", databasePath: ":memory:", googleClientId: "browser-client.apps.googleusercontent.com",
+      verifyGoogleIdToken: async (token) => {
+        if (token === "rejected") throw new Error("invalid signature");
+        return { sub: "google-subject-1", iss: "https://accounts.google.com", aud: "browser-client.apps.googleusercontent.com", exp: Math.floor(Date.now() / 1_000) + 600, nonce, email: "verified@example.test", email_verified: true, name: "Google Friend" };
+      },
+    });
+    cleanup.push(() => app.locals.arenaService.close());
+    const agent = request.agent(app);
+    let challenge = await agent.post("/api/accounts/google/challenge").send({}).expect(200);
+    nonce = challenge.body.nonce;
+    await agent.post("/api/accounts/google").send({ credential: "rejected", state: challenge.body.state }).expect(401);
+    challenge = await agent.post("/api/accounts/google/challenge").send({}).expect(200);
+    nonce = challenge.body.nonce;
+    const google = await agent.post("/api/accounts/google").send({ credential: "valid", state: challenge.body.state }).expect(201);
+    expect(google.body.account).toMatchObject({ profileId: google.body.credential.profileId, tag: null, providers: ["google"], passwordEnabled: false });
+    const custom = (app.locals.accountService as AccountService).register({ displayName: "Custom Friend", password: "custom durable password" });
+    challenge = await agent.post("/api/accounts/google/challenge").send({}).expect(200);
+    nonce = challenge.body.nonce;
+    await agent.post("/api/accounts/google").set({ Authorization: `Bearer ${custom.credential.token}` })
+      .send({ credential: "valid", state: challenge.body.state, action: "link" }).expect(409);
   });
 });

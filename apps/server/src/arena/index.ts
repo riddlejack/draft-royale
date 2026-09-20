@@ -7,7 +7,7 @@ import path from "node:path";
 import { repoRoot } from "../config.js";
 import { createDeckService } from "../decks/service.js";
 import { createDeckRouter } from "../decks/router.js";
-import { createAccountService } from "../accounts/service.js";
+import { createAccountService, type GoogleClaims } from "../accounts/service.js";
 import { createAccountRouter } from "../accounts/router.js";
 import type { DeckDefinition, DeckCollection } from "@draft-royale/shared";
 import { createMirrorRoomService, buildMirrorRemixCandidates } from "../mirror/service.js";
@@ -22,12 +22,25 @@ export * from "./router.js";
 export * from "./collection-import.js";
 export * from "./collection-import-router.js";
 
-export const createArenaApp = (options: ArenaServiceOptions): Express => {
+export type ArenaAppOptions = ArenaServiceOptions & {
+  googleClientId?: string;
+  verifyGoogleIdToken?: (idToken: string, audience: string) => Promise<GoogleClaims>;
+};
+
+export const createArenaApp = (options: ArenaAppOptions): Express => {
   const app = express();
   const service = createArenaService(options);
   const socialService = createSocialService({ arena: service, databasePath: options.databasePath, now: options.now });
   const deckService = createDeckService({ catalog: options.catalog, databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"), now: options.now });
-  const accountService = createAccountService({ social: socialService, databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite") });
+  const collectionImportService = createCollectionImportService({ catalog: options.catalog, apiToken: process.env.CLASH_ROYALE_API_TOKEN, apiBaseUrl: process.env.CLASH_ROYALE_API_BASE_URL, now: options.now });
+  const accountService = createAccountService({
+    social: socialService,
+    databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"),
+    normalizeCollection: service.normalizeCollection,
+    now: options.now,
+    googleClientId: options.googleClientId ?? process.env.GOOGLE_OAUTH_CLIENT_ID,
+    verifyGoogleIdToken: options.verifyGoogleIdToken,
+  });
   const deckSeeds = () => ({ version: 1, generatedAt: new Date().toISOString(), collections: ["video-2v2-decks.json", "classic-decks.json", "official-classic-decks.json"].flatMap((filename) => {
     const file = path.join(repoRoot, "data/catalog", filename);
     if (!existsSync(file)) return [];
@@ -37,8 +50,12 @@ export const createArenaApp = (options: ArenaServiceOptions): Express => {
   const allLibraryDecks = (): DeckDefinition[] => [...deckSeeds().collections.flatMap((collection) => collection.decks ?? []), ...deckService.list()];
   const librarySeeds = () => { const seeds = deckSeeds(); return { ...seeds, collections: [...seeds.collections, { id: "mirror-remixes", title: "Mirror remixes", mode: "mirror", description: "Every deck contains Mirror. Generated from library recipes; these are custom remixes, not Supercell’s official event pool.", decks: buildMirrorRemixCandidates(allLibraryDecks(), options.catalog).map((candidate) => candidate.deck) }] }; };
   const mirrorRoomService = createMirrorRoomService({ catalog: options.catalog, databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"), getDecks: allLibraryDecks });
-  const trackerService = createTrackerService({ databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"), getPlayers: () => accountService.list(), apiToken: process.env.CLASH_ROYALE_API_TOKEN, apiBaseUrl: process.env.CLASH_ROYALE_API_BASE_URL });
-  const collectionImportService = createCollectionImportService({ catalog: options.catalog, apiToken: process.env.CLASH_ROYALE_API_TOKEN, apiBaseUrl: process.env.CLASH_ROYALE_API_BASE_URL, now: options.now });
+  const trackerService = createTrackerService({
+    databasePath: options.databasePath ?? path.join(repoRoot, "data/private/arena.sqlite"),
+    getPlayers: () => accountService.list().filter((account): account is typeof account & { tag: string } => account.tag !== null),
+    apiToken: process.env.CLASH_ROYALE_API_TOKEN,
+    apiBaseUrl: process.env.CLASH_ROYALE_API_BASE_URL,
+  });
   const closeArena = service.close.bind(service);
   service.close = () => {
     try {
@@ -54,7 +71,7 @@ export const createArenaApp = (options: ArenaServiceOptions): Express => {
   app.use(express.json({ limit: "64kb" }));
   app.use(createSocialRouter(socialService));
   app.use(createDeckRouter(deckService, socialService, librarySeeds));
-  app.use(createAccountRouter(accountService, socialService));
+  app.use(createAccountRouter(accountService, socialService, collectionImportService));
   app.use(createMirrorRoomRouter(mirrorRoomService));
   app.use(createTrackerRouter(trackerService, socialService));
   app.use(createCollectionImportRouter(collectionImportService));

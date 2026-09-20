@@ -1,78 +1,421 @@
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { OAuth2Client } from "google-auth-library";
+import type { ArenaCollection } from "@draft-royale/shared";
 import type { SocialService } from "../social/service.js";
 
-export class AccountError extends Error { constructor(readonly status: number, message: string) { super(message); } }
-export interface ClubAccount { username: string; displayName: string; tag: string; profileId: string }
-type AccountRow = { username: string; display_name: string; tag: string; salt: string; password_hash: string; profile_id: string; password_version: number; credential_version: number };
-const accountOf = (row: AccountRow): ClubAccount => ({ username: row.username, displayName: row.display_name, tag: row.tag, profileId: row.profile_id });
+const ACCOUNT_SCHEMA_VERSION = 2;
+const SESSION_TTL_MS = 180 * 24 * 60 * 60 * 1_000;
+const GOOGLE_CHALLENGE_TTL_MS = 10 * 60 * 1_000;
+
+export class AccountError extends Error {
+  constructor(readonly status: number, message: string, readonly code = "ACCOUNT_ERROR") { super(message); }
+}
+
+export interface ClubAccount {
+  username: string;
+  displayName: string;
+  tag: string | null;
+  profileId: string;
+  providers: string[];
+  passwordEnabled: boolean;
+}
+
+interface AccountRow {
+  username: string;
+  display_name: string;
+  tag: string | null;
+  salt: string;
+  password_hash: string;
+  profile_id: string;
+  password_version: number;
+  credential_version: number;
+  password_enabled: number;
+  collection_json: string | null;
+  collection_updated_at: number | null;
+  created_at: number;
+}
+
+export interface GoogleClaims {
+  sub?: string;
+  iss?: string;
+  aud?: string | string[];
+  exp?: number;
+  nonce?: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+}
+
+export interface AccountServiceOptions {
+  databasePath: string;
+  social: SocialService;
+  normalizeCollection: (input: unknown) => ArenaCollection;
+  now?: () => number;
+  googleClientId?: string;
+  verifyGoogleIdToken?: (idToken: string, audience: string) => Promise<GoogleClaims>;
+}
+
+const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+const sameHex = (left: string, right: string) => {
+  const a = Buffer.from(left, "hex");
+  const b = Buffer.from(right, "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
+};
 const nameOf = (value: unknown) => {
-  if (typeof value !== "string" || !/^[a-zA-Z0-9_ .-]{2,32}$/.test(value.trim())) throw new AccountError(400, "Use a player name with 2–32 letters, numbers, spaces, or underscores.");
+  if (typeof value !== "string" || !/^[a-zA-Z0-9_ .-]{2,32}$/.test(value.trim())) {
+    throw new AccountError(400, "Use a player name with 2–32 letters, numbers, spaces, or underscores.", "INVALID_NAME");
+  }
   return value.trim();
 };
-const tagOf = (value: unknown) => {
-  if (typeof value !== "string") throw new AccountError(400, "Enter your Clash Royale player tag.");
-  const tag = `#${value.replace(/^#/, "").trim().toUpperCase()}`;
-  if (!/^#[0289PYLQGRJCUV]{3,15}$/.test(tag)) throw new AccountError(400, "Enter a valid Clash Royale tag, such as #P0LYQ.");
+const providerNameOf = (value: unknown) => {
+  if (typeof value !== "string") return "Player";
+  const cleaned = Array.from(value.trim()).filter((character) => {
+    const point = character.codePointAt(0) ?? 0;
+    return point > 31 && point !== 127;
+  }).join("").slice(0, 32);
+  return cleaned.length >= 2 ? cleaned : "Player";
+};
+const tagOf = (value: unknown): string | null => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") throw new AccountError(400, "Enter a Clash Royale player tag.", "INVALID_PLAYER_TAG");
+  const tag = `#${value.replace(/^#/, "").replace(/\s+/g, "").trim().toUpperCase().replace(/O/g, "0")}`;
+  if (!/^#[0289PYLQGRJCUV]{3,15}$/.test(tag)) throw new AccountError(400, "Enter a valid Clash Royale tag, such as #P0LYQ.", "INVALID_PLAYER_TAG");
   return tag;
 };
 const passwordOf = (value: unknown, displayName?: string) => {
-  if (typeof value !== "string" || value.length < 12 || value.length > 128) throw new AccountError(400, "Use a password with 12–128 characters.");
-  if (displayName && value.toLocaleLowerCase() === displayName.toLocaleLowerCase()) throw new AccountError(400, "Your password cannot be your player name.");
+  if (typeof value !== "string" || value.length < 12 || value.length > 128) throw new AccountError(400, "Use a password with 12–128 characters.", "INVALID_PASSWORD");
+  if (displayName && value.toLocaleLowerCase() === displayName.toLocaleLowerCase()) throw new AccountError(400, "Your password cannot be your player name.", "INVALID_PASSWORD");
   return value;
 };
+const parseCollection = (value: string | null): ArenaCollection | null => {
+  if (!value) return null;
+  try { return JSON.parse(value) as ArenaCollection; }
+  catch { throw new AccountError(500, "The saved collection is unreadable.", "INVALID_ACCOUNT_STATE"); }
+};
 
-export function createAccountService(options: { databasePath: string; social: SocialService }) {
+export function createAccountService(options: AccountServiceOptions) {
+  const now = options.now ?? Date.now;
   const db = new DatabaseSync(options.databasePath);
-  db.exec("PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;");
-  db.exec(`CREATE TABLE IF NOT EXISTS club_account_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-    CREATE TABLE IF NOT EXISTS club_accounts (username TEXT PRIMARY KEY, display_name TEXT NOT NULL, tag TEXT NOT NULL UNIQUE, salt TEXT NOT NULL, password_hash TEXT NOT NULL, profile_id TEXT NOT NULL UNIQUE, password_version INTEGER NOT NULL DEFAULT 1, credential_version INTEGER NOT NULL DEFAULT 1);`);
-  const accountColumns = new Set((db.prepare("PRAGMA table_info(club_accounts)").all() as Array<{ name: string }>).map((column) => column.name));
-  if (!accountColumns.has("password_version")) db.exec("ALTER TABLE club_accounts ADD COLUMN password_version INTEGER NOT NULL DEFAULT 0;");
-  if (!accountColumns.has("credential_version")) db.exec("ALTER TABLE club_accounts ADD COLUMN credential_version INTEGER NOT NULL DEFAULT 0;");
+  db.exec("PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
+  db.exec("CREATE TABLE IF NOT EXISTS club_account_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);");
   db.prepare("INSERT OR IGNORE INTO club_account_meta VALUES('identity_secret',?)").run(randomBytes(32).toString("hex"));
   const secret = String(db.prepare("SELECT value FROM club_account_meta WHERE key='identity_secret'").get()?.value);
-  const credentialFor = (username: string, version: number) => createHmac("sha256", secret)
-    .update(version < 1 ? `club-profile:${username}` : `club-profile:${username}:v${version}`)
-    .digest("base64url");
-  const rows = () => db.prepare("SELECT * FROM club_accounts ORDER BY rowid").all() as unknown as AccountRow[];
-  for (const row of rows().filter((candidate) => candidate.password_version < 1)) {
-    const disabledHash = createHash("sha256").update(createHmac("sha256", secret).update(`club-profile-disabled:${row.username}:${row.profile_id}`).digest("base64url")).digest("hex");
-    db.prepare("UPDATE social_profiles SET token_hash=? WHERE id=? AND token_hash<>?").run(disabledHash, row.profile_id, disabledHash);
+
+  const tableExists = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='club_accounts'").get());
+  const schemaVersion = Number(db.prepare("SELECT value FROM club_account_meta WHERE key='account_schema_version'").get()?.value ?? 0);
+  if (!tableExists) {
+    db.exec(`CREATE TABLE club_accounts (
+      username TEXT PRIMARY KEY, display_name TEXT NOT NULL, tag TEXT, salt TEXT NOT NULL,
+      password_hash TEXT NOT NULL, profile_id TEXT NOT NULL UNIQUE,
+      password_version INTEGER NOT NULL DEFAULT 1, credential_version INTEGER NOT NULL DEFAULT 1,
+      password_enabled INTEGER NOT NULL DEFAULT 1, collection_json TEXT,
+      collection_updated_at INTEGER, created_at INTEGER NOT NULL
+    );`);
+  } else if (schemaVersion < ACCOUNT_SCHEMA_VERSION) {
+    const columns = new Set((db.prepare("PRAGMA table_info(club_accounts)").all() as Array<{ name: string }>).map((column) => column.name));
+    const expression = (column: string, fallback: string) => columns.has(column) ? column : fallback;
+    db.exec("BEGIN IMMEDIATE;");
+    try {
+      db.exec("ALTER TABLE club_accounts RENAME TO club_accounts_legacy;");
+      db.exec(`CREATE TABLE club_accounts (
+        username TEXT PRIMARY KEY, display_name TEXT NOT NULL, tag TEXT, salt TEXT NOT NULL,
+        password_hash TEXT NOT NULL, profile_id TEXT NOT NULL UNIQUE,
+        password_version INTEGER NOT NULL DEFAULT 1, credential_version INTEGER NOT NULL DEFAULT 1,
+        password_enabled INTEGER NOT NULL DEFAULT 1, collection_json TEXT,
+        collection_updated_at INTEGER, created_at INTEGER NOT NULL
+      );`);
+      const migrate = db.prepare(`INSERT INTO club_accounts(username,display_name,tag,salt,password_hash,profile_id,password_version,credential_version,password_enabled,collection_json,collection_updated_at,created_at)
+        SELECT username,display_name,tag,salt,password_hash,profile_id,
+          ${expression("password_version", "0")},${expression("credential_version", "0")},
+          ${expression("password_enabled", "1")},${expression("collection_json", "NULL")},
+          ${expression("collection_updated_at", "NULL")},${expression("created_at", "?")}
+        FROM club_accounts_legacy`);
+      if (columns.has("created_at")) migrate.run(); else migrate.run(now());
+      db.exec("DROP TABLE club_accounts_legacy;");
+      db.exec("COMMIT;");
+    } catch (error) { db.exec("ROLLBACK;"); throw error; }
   }
-  const add = (displayName: string, tag: string, password: string) => {
-    if (rows().length >= 100) throw new AccountError(409, "This friend group has reached 100 players.");
-    const username = displayName.toLowerCase();
-    if (db.prepare("SELECT 1 FROM club_accounts WHERE username=? OR tag=?").get(username, tag)) throw new AccountError(409, "That name or player tag already has an account. Sign in instead.");
-    const salt = randomBytes(16).toString("hex");
-    const hash = scryptSync(password, salt, 32).toString("hex");
-    const profile = options.social.createProfile({ displayName, credentialToken: credentialFor(username, 1) });
-    db.prepare("INSERT INTO club_accounts(username,display_name,tag,salt,password_hash,profile_id,password_version,credential_version) VALUES(?,?,?,?,?,?,1,1)").run(username, displayName, tag, salt, hash, profile.credential.profileId);
-    return accountOf(db.prepare("SELECT * FROM club_accounts WHERE username=?").get(username) as unknown as AccountRow);
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS club_accounts_tag ON club_accounts(tag);
+    CREATE TABLE IF NOT EXISTS account_sessions (
+      id TEXT PRIMARY KEY, profile_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, last_used_at INTEGER NOT NULL, revoked_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS account_sessions_profile ON account_sessions(profile_id, revoked_at, expires_at);
+    CREATE TABLE IF NOT EXISTS account_recovery (
+      profile_id TEXT PRIMARY KEY, code_hash TEXT NOT NULL, generation INTEGER NOT NULL,
+      created_at INTEGER NOT NULL, used_at INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS account_providers (
+      provider TEXT NOT NULL, subject TEXT NOT NULL, profile_id TEXT NOT NULL,
+      email TEXT, display_name TEXT, created_at INTEGER NOT NULL,
+      PRIMARY KEY(provider, subject), UNIQUE(profile_id, provider)
+    );
+  `);
+  db.prepare("INSERT INTO club_account_meta(key,value) VALUES('account_schema_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    .run(String(ACCOUNT_SCHEMA_VERSION));
+
+  const credentialFor = (username: string, version: number) => createHmac("sha256", secret)
+    .update(version < 1 ? `club-profile:${username}` : `club-profile:${username}:v${version}`).digest("base64url");
+  const disabledHashFor = (row: Pick<AccountRow, "username" | "profile_id">) => sha256(createHmac("sha256", secret)
+    .update(`club-profile-disabled:${row.username}:${row.profile_id}`).digest("base64url"));
+  const rows = () => db.prepare("SELECT * FROM club_accounts ORDER BY rowid").all() as unknown as AccountRow[];
+  const rowForProfile = (profileId: string) => db.prepare("SELECT * FROM club_accounts WHERE profile_id=?").get(profileId) as unknown as AccountRow | undefined;
+  const rowForUsername = (username: string) => db.prepare("SELECT * FROM club_accounts WHERE username=?").get(username) as unknown as AccountRow | undefined;
+  const providersFor = (profileId: string) => (db.prepare("SELECT provider FROM account_providers WHERE profile_id=? ORDER BY provider").all(profileId) as Array<{ provider: string }>).map((row) => row.provider);
+  const accountOf = (row: AccountRow): ClubAccount => ({
+    username: row.username, displayName: row.display_name, tag: row.tag, profileId: row.profile_id,
+    providers: providersFor(row.profile_id), passwordEnabled: Boolean(row.password_enabled && row.password_version >= 1),
+  });
+
+  // Convert the former deterministic account bearer into an ordinary revocable session.
+  for (const row of rows()) {
+    const expectedToken = credentialFor(row.username, row.credential_version);
+    const expectedHash = sha256(expectedToken);
+    if (row.password_version >= 1) {
+      const createdAt = now();
+      const migrated = options.social.retirePrimaryCredential(row.profile_id, expectedToken, disabledHashFor(row), "account-session", createdAt + SESSION_TTL_MS);
+      if (migrated) {
+        db.prepare("INSERT OR IGNORE INTO account_sessions(id,profile_id,token_hash,created_at,expires_at,last_used_at) VALUES(?,?,?,?,?,?)")
+          .run(`as_legacy_${sha256(row.profile_id).slice(0, 24)}`, row.profile_id, expectedHash, createdAt, createdAt + SESSION_TTL_MS, createdAt);
+      }
+    } else {
+      options.social.retirePrimaryCredential(row.profile_id, expectedToken, disabledHashFor(row));
+    }
+  }
+
+  const recoveryHash = (code: string) => createHmac("sha256", secret).update(`account-recovery:${code}`).digest("hex");
+  const createRecovery = (profileId: string) => {
+    const code = `DR-${randomBytes(12).toString("hex").toUpperCase().match(/.{1,4}/g)!.join("-")}`;
+    const previous = db.prepare("SELECT generation FROM account_recovery WHERE profile_id=?").get(profileId) as { generation: number } | undefined;
+    db.prepare(`INSERT INTO account_recovery(profile_id,code_hash,generation,created_at,used_at) VALUES(?,?,?,?,NULL)
+      ON CONFLICT(profile_id) DO UPDATE SET code_hash=excluded.code_hash,generation=excluded.generation,created_at=excluded.created_at,used_at=NULL`)
+      .run(profileId, recoveryHash(code), (previous?.generation ?? 0) + 1, now());
+    return code;
   };
+
+  const issueSession = (row: AccountRow) => {
+    const token = randomBytes(32).toString("base64url");
+    const tokenHash = sha256(token);
+    const createdAt = now();
+    const expiresAt = createdAt + SESSION_TTL_MS;
+    db.exec("BEGIN IMMEDIATE;");
+    try {
+      db.prepare("INSERT INTO account_sessions(id,profile_id,token_hash,created_at,expires_at,last_used_at) VALUES(?,?,?,?,?,?)")
+        .run(`as_${randomBytes(16).toString("base64url")}`, row.profile_id, tokenHash, createdAt, expiresAt, createdAt);
+      db.exec("COMMIT;");
+    } catch (error) { db.exec("ROLLBACK;"); throw error; }
+    try { options.social.addCredential(row.profile_id, token, "account-session", expiresAt); }
+    catch (error) {
+      db.prepare("UPDATE account_sessions SET revoked_at=? WHERE token_hash=?").run(now(), tokenHash);
+      throw error;
+    }
+    const auth = options.social.authenticate(token);
+    return {
+      credential: { profileId: row.profile_id, token }, state: options.social.getState(auth), account: accountOf(row),
+      collection: parseCollection(row.collection_json), expiresAt: new Date(expiresAt).toISOString(),
+    };
+  };
+
+  const adoptInitialCredential = (row: AccountRow, token: string) => {
+    const tokenHash = sha256(token);
+    const createdAt = now();
+    const expiresAt = createdAt + SESSION_TTL_MS;
+    db.exec("BEGIN IMMEDIATE;");
+    try {
+      db.prepare("INSERT INTO account_sessions(id,profile_id,token_hash,created_at,expires_at,last_used_at) VALUES(?,?,?,?,?,?)")
+        .run(`as_${randomBytes(16).toString("base64url")}`, row.profile_id, tokenHash, createdAt, expiresAt, createdAt);
+      db.exec("COMMIT;");
+    } catch (error) { db.exec("ROLLBACK;"); throw error; }
+    const adopted = options.social.retirePrimaryCredential(row.profile_id, token, disabledHashFor(row), "account-session", expiresAt);
+    if (!adopted) {
+      db.prepare("UPDATE account_sessions SET revoked_at=? WHERE token_hash=?").run(now(), tokenHash);
+      throw new AccountError(500, "Could not activate the new account session.", "SESSION_ACTIVATION_FAILED");
+    }
+    const auth = options.social.authenticate(token);
+    return {
+      credential: { profileId: row.profile_id, token }, state: options.social.getState(auth), account: accountOf(row),
+      collection: parseCollection(row.collection_json), expiresAt: new Date(expiresAt).toISOString(),
+    };
+  };
+
+  const ensureCapacity = () => {
+    if (rows().length >= 100) throw new AccountError(409, "This friend group has reached 100 players.", "ACCOUNT_LIMIT");
+  };
+  const addPasswordAccount = (displayName: string, password: string, tag: string | null) => {
+    ensureCapacity();
+    const username = displayName.toLowerCase();
+    if (rowForUsername(username)) throw new AccountError(409, "That player name already has an account. Sign in instead.", "USERNAME_TAKEN");
+    const salt = randomBytes(16).toString("hex");
+    const profile = options.social.createProfile({ displayName });
+    db.prepare(`INSERT INTO club_accounts(username,display_name,tag,salt,password_hash,profile_id,password_version,credential_version,password_enabled,created_at)
+      VALUES(?,?,?,?,?,?,1,1,1,?)`).run(username, displayName, tag, salt, scryptSync(password, salt, 32).toString("hex"), profile.credential.profileId, now());
+    const row = rowForUsername(username)!;
+    return { ...adoptInitialCredential(row, profile.credential.token), recoveryCode: createRecovery(row.profile_id) };
+  };
+
   const login = (input: unknown) => {
     const body = input as Record<string, unknown> | null;
     const username = nameOf(body?.username).toLowerCase();
     const password = typeof body?.password === "string" && body.password.length <= 128 ? body.password : "";
-    const row = db.prepare("SELECT * FROM club_accounts WHERE username=?").get(username) as unknown as AccountRow | undefined;
-    const hash = scryptSync(password, row?.salt ?? "invalid-account-salt", 32);
-    if (!row || !timingSafeEqual(hash, Buffer.from(row.password_hash, "hex"))) throw new AccountError(401, "The player name or password is incorrect.");
-    if (row.password_version < 1) throw new AccountError(409, "This private legacy account needs a one-time password migration before it can sign in.");
-    const session = options.social.createProfile({ displayName: row.display_name, credentialToken: credentialFor(username, row.credential_version) });
-    return { ...session, account: accountOf(row) };
+    const row = rowForUsername(username);
+    const hash = scryptSync(password, row?.salt || "invalid-account-salt", 32);
+    const stored = Buffer.from(row?.password_hash || "00".repeat(32), "hex");
+    if (!row || stored.length !== hash.length || !timingSafeEqual(hash, stored)) throw new AccountError(401, "The player name or password is incorrect.", "INVALID_CREDENTIALS");
+    if (!row.password_enabled) throw new AccountError(409, "This account uses a connected sign-in provider.", "PASSWORD_NOT_ENABLED");
+    if (row.password_version < 1) throw new AccountError(409, "This private legacy account needs a one-time password migration before it can sign in.", "LEGACY_PASSWORD_MIGRATION_REQUIRED");
+    return issueSession(row);
   };
   const register = (input: unknown) => {
     const body = input as Record<string, unknown> | null;
     const displayName = nameOf(body?.displayName);
-    const tag = tagOf(body?.tag);
-    const password = passwordOf(body?.password, displayName);
-    add(displayName, tag, password);
-    return login({ username: displayName, password });
+    return addPasswordAccount(displayName, passwordOf(body?.password, displayName), tagOf(body?.tag));
   };
   const forProfile = (profileId: string) => {
-    const row = db.prepare("SELECT * FROM club_accounts WHERE profile_id=?").get(profileId) as unknown as AccountRow | undefined;
+    const row = rowForProfile(profileId);
     return row ? accountOf(row) : null;
   };
-  return { login, register, forProfile, list: () => rows().map(accountOf), close: () => db.close() };
+  const sessionFor = (profileId: string) => {
+    const row = rowForProfile(profileId);
+    return row ? { account: accountOf(row), collection: parseCollection(row.collection_json) } : null;
+  };
+  const touchSession = (token: string) => {
+    db.prepare("UPDATE account_sessions SET last_used_at=? WHERE token_hash=? AND revoked_at IS NULL").run(now(), sha256(token));
+  };
+  const logout = (profileId: string, token: string) => {
+    const tokenHash = sha256(token);
+    const session = db.prepare("SELECT profile_id FROM account_sessions WHERE token_hash=? AND revoked_at IS NULL").get(tokenHash) as { profile_id: string } | undefined;
+    if (!session || session.profile_id !== profileId) throw new AccountError(401, "This session is no longer active.", "INVALID_SESSION");
+    const timestamp = now();
+    db.exec("BEGIN IMMEDIATE;");
+    try {
+      db.prepare("UPDATE account_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL").run(timestamp, tokenHash);
+      db.exec("COMMIT;");
+    } catch (error) { db.exec("ROLLBACK;"); throw error; }
+    options.social.revokeCredential(profileId, token);
+  };
+  const revokeAll = (profileId: string) => {
+    const timestamp = now();
+    db.prepare("UPDATE account_sessions SET revoked_at=? WHERE profile_id=? AND revoked_at IS NULL").run(timestamp, profileId);
+    options.social.revokeCredentials(profileId, "account-session");
+  };
+  const recover = (input: unknown) => {
+    const body = input as Record<string, unknown> | null;
+    const username = nameOf(body?.username).toLowerCase();
+    const code = typeof body?.recoveryCode === "string" ? body.recoveryCode.trim().toUpperCase() : "";
+    const newPassword = passwordOf(body?.newPassword);
+    const row = rowForUsername(username);
+    const recovery = row ? db.prepare("SELECT code_hash,used_at FROM account_recovery WHERE profile_id=?").get(row.profile_id) as { code_hash: string; used_at: number | null } | undefined : undefined;
+    if (!row || !recovery || recovery.used_at !== null || !sameHex(recoveryHash(code || "invalid-recovery-code"), recovery.code_hash)) {
+      throw new AccountError(401, "The player name or recovery code is incorrect.", "INVALID_RECOVERY_CODE");
+    }
+    const salt = randomBytes(16).toString("hex");
+    revokeAll(row.profile_id);
+    db.exec("BEGIN IMMEDIATE;");
+    try {
+      db.prepare("UPDATE club_accounts SET salt=?,password_hash=?,password_version=1,password_enabled=1,credential_version=credential_version+1 WHERE profile_id=?")
+        .run(salt, scryptSync(newPassword, salt, 32).toString("hex"), row.profile_id);
+      db.prepare("UPDATE account_recovery SET used_at=? WHERE profile_id=?").run(now(), row.profile_id);
+      db.exec("COMMIT;");
+    } catch (error) { db.exec("ROLLBACK;"); throw error; }
+    const response = issueSession(rowForProfile(row.profile_id)!);
+    return { ...response, recoveryCode: createRecovery(row.profile_id) };
+  };
+  const updateTag = (profileId: string, value: unknown) => {
+    const tag = tagOf(value);
+    const changed = db.prepare("UPDATE club_accounts SET tag=? WHERE profile_id=?").run(tag, profileId);
+    if (changed.changes !== 1) throw new AccountError(404, "Account not found.", "ACCOUNT_NOT_FOUND");
+    return accountOf(rowForProfile(profileId)!);
+  };
+  const saveCollection = (profileId: string, input: unknown) => {
+    const collection = options.normalizeCollection(input);
+    const changed = db.prepare("UPDATE club_accounts SET collection_json=?,collection_updated_at=? WHERE profile_id=?")
+      .run(JSON.stringify(collection), now(), profileId);
+    if (changed.changes !== 1) throw new AccountError(404, "Account not found.", "ACCOUNT_NOT_FOUND");
+    return collection;
+  };
+
+  const googleClientId = options.googleClientId?.trim() ?? "";
+  const googleClient = googleClientId && !options.verifyGoogleIdToken ? new OAuth2Client(googleClientId) : null;
+  const verifyGoogle = options.verifyGoogleIdToken ?? (async (idToken: string, audience: string) => {
+    const ticket = await googleClient!.verifyIdToken({ idToken, audience });
+    return ticket.getPayload() as GoogleClaims | undefined ?? {};
+  });
+  const createGoogleChallenge = () => {
+    if (!googleClientId) throw new AccountError(503, "Google sign-in is not configured on this server.", "GOOGLE_NOT_CONFIGURED");
+    const nonce = randomBytes(24).toString("base64url");
+    const expiresAt = now() + GOOGLE_CHALLENGE_TTL_MS;
+    const payload = Buffer.from(JSON.stringify({ nonce, expiresAt })).toString("base64url");
+    const signature = createHmac("sha256", secret).update(`google-challenge:${payload}`).digest("base64url");
+    return { state: `${payload}.${signature}`, nonce, expiresAt: new Date(expiresAt).toISOString() };
+  };
+  const readGoogleChallenge = (state: unknown) => {
+    if (typeof state !== "string" || state.length > 1_000) throw new AccountError(400, "Google sign-in challenge is invalid.", "INVALID_GOOGLE_CHALLENGE");
+    const [payload, signature, extra] = state.split(".");
+    if (!payload || !signature || extra) throw new AccountError(400, "Google sign-in challenge is invalid.", "INVALID_GOOGLE_CHALLENGE");
+    const expected = createHmac("sha256", secret).update(`google-challenge:${payload}`).digest("base64url");
+    const left = Buffer.from(signature);
+    const right = Buffer.from(expected);
+    if (left.length !== right.length || !timingSafeEqual(left, right)) throw new AccountError(400, "Google sign-in challenge is invalid.", "INVALID_GOOGLE_CHALLENGE");
+    let challenge: { nonce?: unknown; expiresAt?: unknown };
+    try { challenge = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as typeof challenge; }
+    catch { throw new AccountError(400, "Google sign-in challenge is invalid.", "INVALID_GOOGLE_CHALLENGE"); }
+    if (typeof challenge.nonce !== "string" || typeof challenge.expiresAt !== "number" || challenge.expiresAt <= now()) {
+      throw new AccountError(400, "Google sign-in challenge expired. Try again.", "GOOGLE_CHALLENGE_EXPIRED");
+    }
+    return challenge as { nonce: string; expiresAt: number };
+  };
+  const googleLogin = async (input: unknown, linkProfileId?: string) => {
+    if (!googleClientId) throw new AccountError(503, "Google sign-in is not configured on this server.", "GOOGLE_NOT_CONFIGURED");
+    const body = input as Record<string, unknown> | null;
+    const idToken = typeof body?.credential === "string" && body.credential.length <= 20_000 ? body.credential : "";
+    if (!idToken) throw new AccountError(400, "Google did not return a valid credential.", "INVALID_GOOGLE_TOKEN");
+    const challenge = readGoogleChallenge(body?.state);
+    let claims: GoogleClaims;
+    try { claims = await verifyGoogle(idToken, googleClientId); }
+    catch { throw new AccountError(401, "Google could not verify this sign-in.", "INVALID_GOOGLE_TOKEN"); }
+    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    if (!claims.sub || !["accounts.google.com", "https://accounts.google.com"].includes(claims.iss ?? "")
+      || !audiences.includes(googleClientId) || typeof claims.exp !== "number" || claims.exp * 1_000 <= now()
+      || claims.nonce !== challenge.nonce) {
+      throw new AccountError(401, "Google could not verify this sign-in.", "INVALID_GOOGLE_TOKEN");
+    }
+    const existing = db.prepare("SELECT profile_id FROM account_providers WHERE provider='google' AND subject=?").get(claims.sub) as { profile_id: string } | undefined;
+    if (linkProfileId) {
+      if (!rowForProfile(linkProfileId)) throw new AccountError(404, "Account not found.", "ACCOUNT_NOT_FOUND");
+      if (existing && existing.profile_id !== linkProfileId) throw new AccountError(409, "That Google account is already connected to another Draft Royale account.", "PROVIDER_ALREADY_LINKED");
+      const other = db.prepare("SELECT subject FROM account_providers WHERE provider='google' AND profile_id=?").get(linkProfileId) as { subject: string } | undefined;
+      if (other && other.subject !== claims.sub) throw new AccountError(409, "This Draft Royale account already has a different Google sign-in.", "ACCOUNT_PROVIDER_EXISTS");
+      db.prepare("INSERT OR IGNORE INTO account_providers(provider,subject,profile_id,email,display_name,created_at) VALUES('google',?,?,?,?,?)")
+        .run(claims.sub, linkProfileId, claims.email_verified ? claims.email ?? null : null, providerNameOf(claims.name), now());
+      return issueSession(rowForProfile(linkProfileId)!);
+    }
+    if (existing) return issueSession(rowForProfile(existing.profile_id)!);
+    ensureCapacity();
+    const displayName = providerNameOf(claims.name);
+    const username = `google_${sha256(claims.sub).slice(0, 20)}`;
+    const profile = options.social.createProfile({ displayName });
+    db.exec("BEGIN IMMEDIATE;");
+    try {
+      db.prepare(`INSERT INTO club_accounts(username,display_name,tag,salt,password_hash,profile_id,password_version,credential_version,password_enabled,created_at)
+        VALUES(?,?,?,?,?,?,1,1,0,?)`).run(username, displayName, null, "", "", profile.credential.profileId, now());
+      db.prepare("INSERT INTO account_providers(provider,subject,profile_id,email,display_name,created_at) VALUES('google',?,?,?,?,?)")
+        .run(claims.sub, profile.credential.profileId, claims.email_verified ? claims.email ?? null : null, displayName, now());
+      db.exec("COMMIT;");
+    } catch (error) { db.exec("ROLLBACK;"); throw error; }
+    return adoptInitialCredential(rowForProfile(profile.credential.profileId)!, profile.credential.token);
+  };
+
+  return {
+    login, register, recover, logout, forProfile, sessionFor, touchSession, updateTag, saveCollection,
+    createGoogleChallenge, googleLogin,
+    providerConfig: () => ({
+      google: googleClientId ? { enabled: true, clientId: googleClientId } : { enabled: false },
+      apple: { enabled: false, reason: "Apple web sign-in requires operator credentials and an associated Apple app configuration." },
+    }),
+    list: () => rows().map(accountOf), close: () => db.close(),
+  };
 }
+
 export type AccountService = ReturnType<typeof createAccountService>;

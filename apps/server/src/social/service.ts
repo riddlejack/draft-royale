@@ -107,6 +107,10 @@ export interface SocialService {
   declineInvite(auth: AuthenticatedSocialProfile, inviteId: unknown, input: { commandId: unknown }): { invite: SocialInvite; state: SocialState };
   cancelInvite(auth: AuthenticatedSocialProfile, inviteId: unknown, input: { commandId: unknown }): { invite: SocialInvite; state: SocialState };
   getInviteSession(auth: AuthenticatedSocialProfile, inviteId: unknown): SocialSessionResponse;
+  addCredential(profileId: string, token: string, kind: string, expiresAt: number | null): void;
+  retirePrimaryCredential(profileId: string, token: string, replacementHash: string, kind?: string, expiresAt?: number | null): boolean;
+  revokeCredential(profileId: string, token: string): void;
+  revokeCredentials(profileId: string, kind: string): void;
   close(): void;
 }
 
@@ -169,6 +173,17 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS social_profile_credentials (
+      token_hash TEXT PRIMARY KEY,
+      profile_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER,
+      revoked_at INTEGER,
+      FOREIGN KEY (profile_id) REFERENCES social_profiles(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS social_profile_credentials_profile
+      ON social_profile_credentials(profile_id, revoked_at, expires_at);
     CREATE TABLE IF NOT EXISTS social_friend_links (
       id TEXT PRIMARY KEY,
       owner_profile_id TEXT NOT NULL,
@@ -319,7 +334,11 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
   const authenticate = (token: string): AuthenticatedSocialProfile => {
     ensureOpen();
     if (!token || token.length > 256) throw new SocialError(401, "Valid profile credentials are required", "UNAUTHORIZED");
-    const row = db.prepare("SELECT id, display_name, token_hash, created_at FROM social_profiles WHERE token_hash = ?").get(sha256(token)) as unknown as ProfileRow | undefined;
+    const tokenHash = sha256(token);
+    const row = (db.prepare("SELECT id, display_name, token_hash, created_at FROM social_profiles WHERE token_hash = ?").get(tokenHash)
+      ?? db.prepare(`SELECT p.id,p.display_name,p.token_hash,p.created_at
+        FROM social_profile_credentials c JOIN social_profiles p ON p.id=c.profile_id
+        WHERE c.token_hash=? AND c.revoked_at IS NULL AND (c.expires_at IS NULL OR c.expires_at>?)`).get(tokenHash, now())) as unknown as ProfileRow | undefined;
     if (!row) throw new SocialError(401, "Valid profile credentials are required", "UNAUTHORIZED");
     return { profile: row, token };
   };
@@ -355,6 +374,39 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     const profile = profileRow(id);
     const auth = { profile, token };
     return { created: !existing, credential: { profileId: profile.id, token }, state: getState(auth) };
+  };
+
+  const addCredential = (profileId: string, token: string, kind: string, expiresAt: number | null) => {
+    ensureOpen();
+    profileRow(profileId);
+    if (!tokenPattern.test(token)) throw new SocialError(400, "credential token must be 32 bytes of base64url data", "INVALID_INPUT");
+    db.prepare("INSERT INTO social_profile_credentials(token_hash,profile_id,kind,created_at,expires_at,revoked_at) VALUES(?,?,?,?,?,NULL)")
+      .run(sha256(token), profileId, requireString(kind, "credential kind", 40), now(), expiresAt);
+  };
+
+  const retirePrimaryCredential = (profileId: string, token: string, replacementHash: string, kind?: string, expiresAt?: number | null) => {
+    ensureOpen();
+    const currentHash = sha256(token);
+    const profile = profileRow(profileId);
+    if (profile.token_hash !== currentHash) return false;
+    transaction(() => {
+      if (kind) db.prepare("INSERT OR IGNORE INTO social_profile_credentials(token_hash,profile_id,kind,created_at,expires_at,revoked_at) VALUES(?,?,?,?,?,NULL)")
+        .run(currentHash, profileId, requireString(kind, "credential kind", 40), now(), expiresAt ?? null);
+      db.prepare("UPDATE social_profiles SET token_hash=?,updated_at=? WHERE id=? AND token_hash=?").run(replacementHash, now(), profileId, currentHash);
+    });
+    return true;
+  };
+
+  const revokeCredential = (profileId: string, token: string) => {
+    ensureOpen();
+    db.prepare("UPDATE social_profile_credentials SET revoked_at=? WHERE profile_id=? AND token_hash=? AND revoked_at IS NULL")
+      .run(now(), profileId, sha256(token));
+  };
+
+  const revokeCredentials = (profileId: string, kind: string) => {
+    ensureOpen();
+    db.prepare("UPDATE social_profile_credentials SET revoked_at=? WHERE profile_id=? AND kind=? AND revoked_at IS NULL")
+      .run(now(), profileId, kind);
   };
 
   const updateProfile = (auth: AuthenticatedSocialProfile, input: { displayName: unknown; commandId: unknown }) => {
@@ -586,6 +638,10 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
   return {
     createProfile,
     authenticate,
+    addCredential,
+    retirePrimaryCredential,
+    revokeCredential,
+    revokeCredentials,
     getState,
     updateProfile,
     createFriendLink,
