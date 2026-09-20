@@ -6,9 +6,9 @@ import { createTrackerRouter } from "./router.js";
 import { createTrackerService, type TrackerRegisteredPlayer, type TrackerService } from "./service.js";
 
 const players: TrackerRegisteredPlayer[] = [
-  { profileId: "a", displayName: "PlayerOne", tag: "#P0" },
-  { profileId: "b", displayName: "PlayerThree", tag: "#Y2" },
-  { profileId: "c", displayName: "PlayerTwo", tag: "#L8" },
+  { profileId: "a", displayName: "Alpha", tag: "#P0" },
+  { profileId: "b", displayName: "Bravo", tag: "#Y2" },
+  { profileId: "c", displayName: "Charlie", tag: "#L8" },
   { profileId: "d", displayName: "Fourth", tag: "#Q9" },
 ];
 

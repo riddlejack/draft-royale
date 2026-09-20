@@ -73,10 +73,10 @@ describe("persistent social profiles and friends", () => {
     const databasePath = database();
     let app = createTestApp(databasePath);
     const token = browserToken(1);
-    const first = await request(app).post("/api/social/profiles").send({ displayName: "Rival", credentialToken: token }).expect(201);
+    const first = await request(app).post("/api/social/profiles").send({ displayName: "Friend", credentialToken: token }).expect(201);
     const replay = await request(app).post("/api/social/profiles").send({ displayName: "Forged rename", credentialToken: token }).expect(200);
     expect(replay.body.credential).toEqual(first.body.credential);
-    expect(replay.body.state.profile.displayName).toBe("Rival");
+    expect(replay.body.state.profile.displayName).toBe("Friend");
 
     const inspection = new DatabaseSync(databasePath, { readOnly: true });
     const row = inspection.prepare("SELECT token_hash FROM social_profiles WHERE id = ?").get(first.body.credential.profileId) as { token_hash: string };
@@ -88,7 +88,7 @@ describe("persistent social profiles and friends", () => {
     apps.splice(apps.indexOf(app), 1);
     app = createTestApp(databasePath);
     const restored = await request(app).get("/api/social/state").set(bearer(token)).expect(200);
-    expect(restored.body.state.profile).toMatchObject({ id: first.body.credential.profileId, displayName: "Rival" });
+    expect(restored.body.state.profile).toMatchObject({ id: first.body.credential.profileId, displayName: "Friend" });
     await request(app).get("/api/social/state").set(bearer(browserToken(9))).expect(401, { error: "Valid profile credentials are required", code: "UNAUTHORIZED" });
   });
 

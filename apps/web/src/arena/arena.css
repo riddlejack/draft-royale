@@ -58,6 +58,7 @@ input,select { color:#eff6ff; border:1px solid #527396; background:#102942; bord
 .home-links button,.text-button { display:flex; justify-content:center;align-items:center;gap:6px;background:none;border:0;color:#c3d8eb;font-weight:800;font-size:12px; }
 .home-footer { text-align:center; margin-top:auto; padding-top:18px; color:#8ba9c4; font-size:11px; }
 .home-footer small { display:block; color:#718ea8; margin-top:4px; font-size:9px; }
+.unofficial-notice { position:fixed;z-index:12;left:50%;bottom:4px;transform:translateX(-50%);max-width:calc(100vw - 24px);padding:3px 7px;border-radius:5px;background:#07131ddb;color:#b8c8d7;font-size:9px;line-height:1.2;text-align:center;pointer-events:none; }
 .full-width { width:100%; }
 .muted { color:#adc3d9; font-size:12px; line-height:1.55; }
 .room-scene,.finish-scene { min-height:100svh; }

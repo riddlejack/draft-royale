@@ -17,7 +17,6 @@ export function createAccountRouter(accounts: AccountService, social: SocialServ
     }
     next();
   });
-  router.get("/api/accounts", (_request, response) => response.json({ players: accounts.list().map(({ displayName, tag }) => ({ displayName, tag })) }));
   router.post("/api/accounts/login", (request, response) => response.json(accounts.login(request.body)));
   router.post("/api/accounts/register", (request, response) => response.status(201).json(accounts.register(request.body)));
   router.get("/api/accounts/session", (request, response) => {

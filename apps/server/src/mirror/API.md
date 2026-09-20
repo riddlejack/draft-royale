@@ -7,7 +7,7 @@ All responses use `Cache-Control: no-store`. Room credentials are opaque bearer 
 `POST /api/mirror/rooms`
 
 ```json
-{ "name": "Jack", "playlist": "mirror" }
+{ "name": "Host", "playlist": "mirror" }
 ```
 
 `playlist` is `mirror`, `classics`, or `community`; it defaults to `mirror`. An optional legal eight-card `deck` starts the room with a custom selection. A custom deck in the Mirror playlist must contain Mirror.
