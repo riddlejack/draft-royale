@@ -162,8 +162,9 @@ export function createAccountService(options: AccountServiceOptions) {
 
   const credentialFor = (username: string, version: number) => createHmac("sha256", secret)
     .update(version < 1 ? `club-profile:${username}` : `club-profile:${username}:v${version}`).digest("base64url");
-  const disabledHashFor = (row: Pick<AccountRow, "username" | "profile_id">) => sha256(createHmac("sha256", secret)
-    .update(`club-profile-disabled:${row.username}:${row.profile_id}`).digest("base64url"));
+  // This is deliberately random and never exposed as a token. A copied database
+  // includes identity_secret, so a deterministic "disabled" bearer is still derivable.
+  const disabledCredentialHash = () => randomBytes(32).toString("hex");
   const rows = () => db.prepare("SELECT * FROM club_accounts ORDER BY rowid").all() as unknown as AccountRow[];
   const rowForProfile = (profileId: string) => db.prepare("SELECT * FROM club_accounts WHERE profile_id=?").get(profileId) as unknown as AccountRow | undefined;
   const rowForUsername = (username: string) => db.prepare("SELECT * FROM club_accounts WHERE username=?").get(username) as unknown as AccountRow | undefined;
@@ -177,7 +178,7 @@ export function createAccountService(options: AccountServiceOptions) {
   for (const row of rows()) {
     const expectedToken = credentialFor(row.username, row.credential_version);
     // A copied legacy database contains the HMAC secret, so never carry its deterministic bearer forward.
-    options.social.retirePrimaryCredential(row.profile_id, expectedToken, disabledHashFor(row));
+    options.social.retirePrimaryCredential(row.profile_id, expectedToken, disabledCredentialHash());
   }
 
   const recoveryHash = (code: string) => createHmac("sha256", secret).update(`account-recovery:${code}`).digest("hex");
@@ -223,7 +224,7 @@ export function createAccountService(options: AccountServiceOptions) {
         .run(`as_${randomBytes(16).toString("base64url")}`, row.profile_id, tokenHash, createdAt, expiresAt, createdAt);
       db.exec("COMMIT;");
     } catch (error) { db.exec("ROLLBACK;"); throw error; }
-    const adopted = options.social.retirePrimaryCredential(row.profile_id, token, disabledHashFor(row), "account-session", expiresAt);
+    const adopted = options.social.retirePrimaryCredential(row.profile_id, token, disabledCredentialHash(), "account-session", expiresAt);
     if (!adopted) {
       db.prepare("UPDATE account_sessions SET revoked_at=? WHERE token_hash=?").run(now(), tokenHash);
       throw new AccountError(500, "Could not activate the new account session.", "SESSION_ACTIVATION_FAILED");
