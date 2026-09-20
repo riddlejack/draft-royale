@@ -16,19 +16,35 @@ const secureRequest = (request: express.Request) => request.secure || request.he
 
 export function createAccountRouter(accounts: AccountService, social: SocialService, collectionImport: CollectionImportService): express.Router {
   const router = express.Router();
-  const attempts = new Map<string, { at: number; count: number }>();
+  const attempts = new Map<string, { resetsAt: number; count: number }>();
   router.use("/api/accounts", (request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
-    if (request.method === "POST") {
-      const time = Date.now();
-      if (attempts.size > 2_000) for (const [key, bucket] of attempts) if (time - bucket.at > 600_000) attempts.delete(key);
-      const key = request.ip ?? "local";
-      const bucket = attempts.get(key);
-      if (!bucket || time - bucket.at > 600_000) attempts.set(key, { at: time, count: 1 });
-      else if (++bucket.count > 60) { response.status(429).json({ error: "Too many account requests. Try again in ten minutes.", code: "RATE_LIMITED" }); return; }
-    }
     next();
   });
+  const rateLimit = (scope: string, maximum: number, windowMs: number, includeUsername = false): express.RequestHandler => (request, response, next) => {
+    const timestamp = Date.now();
+    if (attempts.size > 5_000) for (const [key, bucket] of attempts) if (bucket.resetsAt <= timestamp) attempts.delete(key);
+    const input = request.body && typeof request.body === "object" && !Array.isArray(request.body) ? request.body as Record<string, unknown> : {};
+    const username = includeUsername && typeof input.username === "string" ? input.username.trim().toLowerCase().slice(0, 64) : "";
+    const key = `${scope}:${request.ip ?? "local"}:${username}`;
+    let bucket = attempts.get(key);
+    if (!bucket || bucket.resetsAt <= timestamp) {
+      bucket = { count: 0, resetsAt: timestamp + windowMs };
+      attempts.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (bucket.count > maximum) {
+      response.setHeader("Retry-After", String(Math.max(1, Math.ceil((bucket.resetsAt - timestamp) / 1_000))));
+      response.status(429).json({ error: "Too many attempts. Try again later.", code: "RATE_LIMITED" });
+      return;
+    }
+    next();
+  };
+  const tunnelBudget = rateLimit("account-global", 300, 10 * 60_000);
+  const credentialBudget = rateLimit("account-credential", 12, 10 * 60_000, true);
+  const registrationBudget = rateLimit("account-registration", 60, 60 * 60_000);
+  const providerBudget = rateLimit("account-provider", 120, 10 * 60_000);
+  const mutationBudget = rateLimit("account-authenticated", 600, 10 * 60_000);
 
   const auth = (request: express.Request) => {
     const token = bearer(request.header("authorization"));
@@ -40,7 +56,7 @@ export function createAccountRouter(accounts: AccountService, social: SocialServ
   };
 
   router.get("/api/accounts/providers", (_request, response) => response.json(accounts.providerConfig()));
-  router.post("/api/accounts/google/challenge", (request, response) => {
+  router.post("/api/accounts/google/challenge", providerBudget, (request, response) => {
     const challenge = accounts.createGoogleChallenge();
     response.cookie(googleStateCookie, challenge.state, {
       httpOnly: true, sameSite: "lax", secure: secureRequest(request), maxAge: 10 * 60 * 1_000,
@@ -48,7 +64,7 @@ export function createAccountRouter(accounts: AccountService, social: SocialServ
     });
     response.json(challenge);
   });
-  router.post("/api/accounts/google", async (request, response, next) => {
+  router.post("/api/accounts/google", providerBudget, async (request, response, next) => {
     try {
       const state = request.body && typeof request.body === "object" ? (request.body as Record<string, unknown>).state : undefined;
       const cookie = cookieValue(request.header("cookie"), googleStateCookie);
@@ -60,29 +76,29 @@ export function createAccountRouter(accounts: AccountService, social: SocialServ
       response.status(profileId ? 200 : 201).json(result);
     } catch (error) { next(error); }
   });
-  router.post("/api/accounts/login", (request, response) => response.json(accounts.login(request.body)));
-  router.post("/api/accounts/register", (request, response) => response.status(201).json(accounts.register(request.body)));
-  router.post("/api/accounts/recover", (request, response) => response.json(accounts.recover(request.body)));
+  router.post("/api/accounts/login", tunnelBudget, credentialBudget, (request, response) => response.json(accounts.login(request.body)));
+  router.post("/api/accounts/register", tunnelBudget, registrationBudget, (request, response) => response.status(201).json(accounts.register(request.body)));
+  router.post("/api/accounts/recover", tunnelBudget, credentialBudget, (request, response) => response.json(accounts.recover(request.body)));
   router.get("/api/accounts/session", (request, response) => {
     const user = auth(request);
     response.json(accounts.sessionFor(user.profile.id));
   });
-  router.post("/api/accounts/logout", (request, response) => {
+  router.post("/api/accounts/logout", mutationBudget, (request, response) => {
     const user = auth(request);
     accounts.logout(user.profile.id, user.token);
     response.json({ ok: true });
   });
-  router.patch("/api/accounts/profile", (request, response) => {
+  router.patch("/api/accounts/profile", mutationBudget, (request, response) => {
     const user = auth(request);
     const body = request.body && typeof request.body === "object" ? request.body as Record<string, unknown> : {};
     response.json({ account: accounts.updateTag(user.profile.id, body.tag) });
   });
-  router.put("/api/accounts/collection", (request, response) => {
+  router.put("/api/accounts/collection", mutationBudget, (request, response) => {
     const user = auth(request);
     const body = request.body && typeof request.body === "object" ? request.body as Record<string, unknown> : {};
     response.json({ collection: accounts.saveCollection(user.profile.id, body.collection) });
   });
-  router.post("/api/accounts/collection/import", async (request, response, next) => {
+  router.post("/api/accounts/collection/import", mutationBudget, async (request, response, next) => {
     try {
       const user = auth(request);
       if (!user.account.tag) throw new AccountError(409, "Add a Clash Royale tag before importing a collection.", "PLAYER_TAG_REQUIRED");
