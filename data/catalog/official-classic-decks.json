@@ -1,0 +1,446 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-09T01:40:36.413500+00:00",
+  "collections": [
+    {
+      "id": "official-classics-2018",
+      "title": "Supercell Classics \u00b7 2018",
+      "mode": "classic",
+      "description": "12 historical decks verified against the copy links in Supercell\u2019s official announcement. Card costs use today\u2019s catalog.",
+      "decks": [
+        {
+          "id": "sc-2018-giant-sparky",
+          "name": "Giant Sparky",
+          "mode": "classic",
+          "cards": [
+            "giant",
+            "sparky",
+            "wizard",
+            "bats",
+            "spear-goblins",
+            "skeleton-army",
+            "zap",
+            "poison"
+          ],
+          "forms": {
+            "giant": "base",
+            "sparky": "base",
+            "wizard": "base",
+            "bats": "base",
+            "spear-goblins": "base",
+            "skeleton-army": "base",
+            "zap": "base",
+            "poison": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-golem-beatdown",
+          "name": "Golem Beatdown",
+          "mode": "classic",
+          "cards": [
+            "golem",
+            "lumberjack",
+            "night-witch",
+            "mega-minion",
+            "goblins",
+            "elixir-collector",
+            "zap",
+            "lightning"
+          ],
+          "forms": {
+            "golem": "base",
+            "lumberjack": "base",
+            "night-witch": "base",
+            "mega-minion": "base",
+            "goblins": "base",
+            "elixir-collector": "base",
+            "zap": "base",
+            "lightning": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-p-e-k-k-a-defense",
+          "name": "P.E.K.K.A Defense",
+          "mode": "classic",
+          "cards": [
+            "pekka",
+            "bandit",
+            "minions",
+            "dart-goblin",
+            "electro-wizard",
+            "ice-spirit",
+            "zap",
+            "poison"
+          ],
+          "forms": {
+            "pekka": "base",
+            "bandit": "base",
+            "minions": "base",
+            "dart-goblin": "base",
+            "electro-wizard": "base",
+            "ice-spirit": "base",
+            "zap": "base",
+            "poison": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-lavaloon",
+          "name": "LavaLoon",
+          "mode": "classic",
+          "cards": [
+            "lava-hound",
+            "balloon",
+            "mega-minion",
+            "minions",
+            "guards",
+            "tombstone",
+            "arrows",
+            "lightning"
+          ],
+          "forms": {
+            "lava-hound": "base",
+            "balloon": "base",
+            "mega-minion": "base",
+            "minions": "base",
+            "guards": "base",
+            "tombstone": "base",
+            "arrows": "base",
+            "lightning": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-spell-traps",
+          "name": "Spell Traps",
+          "mode": "classic",
+          "cards": [
+            "princess",
+            "goblin-barrel",
+            "goblin-gang",
+            "valkyrie",
+            "ice-spirit",
+            "inferno-tower",
+            "the-log",
+            "rocket"
+          ],
+          "forms": {
+            "princess": "base",
+            "goblin-barrel": "base",
+            "goblin-gang": "base",
+            "valkyrie": "base",
+            "ice-spirit": "base",
+            "inferno-tower": "base",
+            "the-log": "base",
+            "rocket": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-ride-the-hogcycle",
+          "name": "Ride the HogCycle",
+          "mode": "classic",
+          "cards": [
+            "hog-rider",
+            "musketeer",
+            "ice-golem",
+            "ice-spirit",
+            "skeletons",
+            "cannon",
+            "the-log",
+            "fireball"
+          ],
+          "forms": {
+            "hog-rider": "base",
+            "musketeer": "base",
+            "ice-golem": "base",
+            "ice-spirit": "base",
+            "skeletons": "base",
+            "cannon": "base",
+            "the-log": "base",
+            "fireball": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-three-musketeers",
+          "name": "Three Musketeers",
+          "mode": "classic",
+          "cards": [
+            "three-musketeers",
+            "minion-horde",
+            "goblin-gang",
+            "ice-golem",
+            "miner",
+            "battle-ram",
+            "elixir-collector",
+            "the-log"
+          ],
+          "forms": {
+            "three-musketeers": "base",
+            "minion-horde": "base",
+            "goblin-gang": "base",
+            "ice-golem": "base",
+            "miner": "base",
+            "battle-ram": "base",
+            "elixir-collector": "base",
+            "the-log": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-x-bow-control",
+          "name": "X-Bow Control",
+          "mode": "classic",
+          "cards": [
+            "x-bow",
+            "tesla",
+            "ice-golem",
+            "fire-spirit",
+            "archers",
+            "skeletons",
+            "the-log",
+            "fireball"
+          ],
+          "forms": {
+            "x-bow": "base",
+            "tesla": "base",
+            "ice-golem": "base",
+            "fire-spirit": "base",
+            "archers": "base",
+            "skeletons": "base",
+            "the-log": "base",
+            "fireball": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-grave-robbers",
+          "name": "Grave Robbers",
+          "mode": "classic",
+          "cards": [
+            "graveyard",
+            "rascals",
+            "mega-minion",
+            "skeletons",
+            "ice-golem",
+            "goblin-hut",
+            "the-log",
+            "poison"
+          ],
+          "forms": {
+            "graveyard": "base",
+            "rascals": "base",
+            "mega-minion": "base",
+            "skeletons": "base",
+            "ice-golem": "base",
+            "goblin-hut": "base",
+            "the-log": "base",
+            "poison": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-kings-and-sons",
+          "name": "Kings and Sons",
+          "mode": "classic",
+          "cards": [
+            "prince",
+            "dark-prince",
+            "royal-ghost",
+            "magic-archer",
+            "bats",
+            "zappies",
+            "barbarian-barrel",
+            "fireball"
+          ],
+          "forms": {
+            "prince": "base",
+            "dark-prince": "base",
+            "royal-ghost": "base",
+            "magic-archer": "base",
+            "bats": "base",
+            "zappies": "base",
+            "barbarian-barrel": "base",
+            "fireball": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-mortar-3-0",
+          "name": "Mortar 3.0",
+          "mode": "classic",
+          "cards": [
+            "mortar",
+            "knight",
+            "archers",
+            "inferno-dragon",
+            "ice-spirit",
+            "the-log",
+            "arrows",
+            "fireball"
+          ],
+          "forms": {
+            "mortar": "base",
+            "knight": "base",
+            "archers": "base",
+            "inferno-dragon": "base",
+            "ice-spirit": "base",
+            "the-log": "base",
+            "arrows": "base",
+            "fireball": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "sc-2018-mega-balloon",
+          "name": "Mega Balloon",
+          "mode": "classic",
+          "cards": [
+            "mega-knight",
+            "balloon",
+            "miner",
+            "hunter",
+            "mega-minion",
+            "knight",
+            "ice-spirit",
+            "zap"
+          ],
+          "forms": {
+            "mega-knight": "base",
+            "balloon": "base",
+            "miner": "base",
+            "hunter": "base",
+            "mega-minion": "base",
+            "knight": "base",
+            "ice-spirit": "base",
+            "zap": "base"
+          },
+          "tags": [
+            "Official historical playlist",
+            "2018"
+          ],
+          "description": "From the deck-copy link in Supercell\u2019s June 2018 Classic Decks announcement. Historical recipe; not a claim about today\u2019s event pool.",
+          "source": {
+            "kind": "supercell",
+            "label": "Supercell \u00b7 Classic Decks announcement (June 2018)",
+            "url": "https://supercell.com/en/games/clashroyale/blog/news/new-collection-day-game-mode/",
+            "confidence": "verified"
+          }
+        }
+      ]
+    }
+  ]
+}

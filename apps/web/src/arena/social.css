@@ -1,0 +1,96 @@
+.social-modal { padding-bottom:24px; }
+.social-modal .modal-heading>div { display:flex;align-items:center;gap:9px;min-width:0; }
+.social-heading-badge { padding:4px 7px;border:1px solid #dfffad70;border-radius:999px;background:#568b37;color:#efffd7;font-size:9px;font-weight:900;white-space:nowrap; }
+.social-privacy { display:flex;align-items:flex-start;gap:9px;margin:0 0 12px;padding:9px 10px;border:1px solid #7795ad4d;border-radius:9px;background:#112b438f;color:#b9cfe1;font-size:10px;font-weight:700;line-height:1.45; }
+.social-privacy svg { flex:0 0 auto;color:#ffe089; }
+.social-display-name { display:flex;align-items:center;gap:10px;margin:0 0 10px;color:#c0d3e3;font-size:10px;font-weight:900; }
+.social-display-name input { flex:1;min-width:0;padding:8px 10px; }
+.social-section { margin-top:14px;padding-top:14px;border-top:1px solid #7895ad48; }
+.social-section-heading { display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:9px; }
+.social-section-heading h3 { margin:0;color:#fff4d5;font-size:18px;line-height:1.2; }
+.social-section-heading p { margin:4px 0 0;color:#adc5d9;font-size:9px;font-weight:700;line-height:1.45; }
+.social-section-heading>span { flex:0 0 auto;padding-top:3px;color:#ffe18a;font-size:10px;font-weight:900; }
+.social-list { display:flex;flex-direction:column;gap:7px; }
+.social-row { display:grid;grid-template-columns:36px minmax(0,1fr) auto 30px;align-items:center;gap:8px;padding:8px;border:1px solid #7391a853;border-radius:10px;background:#173651a3; }
+.social-avatar { display:grid;place-items:center;width:36px;height:39px;clip-path:polygon(0 0,100% 0,100% 72%,50% 100%,0 72%);background:linear-gradient(#ffd96d,#d79525);color:#68400f;font-family:var(--royale-heading);font-size:17px; }
+.social-row>div { min-width:0; }
+.social-row strong { display:block;overflow:hidden;font-size:13px;text-overflow:ellipsis;white-space:nowrap; }
+.social-row small { display:block;margin-top:2px;color:#9fb8cd;font-size:9px; }
+.social-challenge { min-height:34px;padding:6px 8px;font-size:10px;box-shadow:none; }
+.social-remove { width:30px;height:30px;border-color:#cf7d8752;color:#f2a9ae; }
+.social-empty { display:grid;place-items:center;min-height:112px;padding:17px;border:1px dashed #7d9bb35c;border-radius:10px;color:#92adc3;text-align:center; }
+.social-empty svg { margin-bottom:7px;color:#89a8c0; }
+.social-empty strong { color:#d7e5f0;font-size:12px; }
+.social-empty span,.social-empty-line { margin:4px 0 0;color:#98b2c8;font-size:10px; }
+.social-request { display:grid;grid-template-columns:38px minmax(0,1fr);gap:4px 10px;margin:11px 0;padding:12px;border:2px solid #efc25e;border-radius:12px;background:linear-gradient(135deg,#725323,#3b3e3e);box-shadow:inset 0 1px 0 #fff4; }
+.social-request>svg { grid-row:1;color:#ffe386; }
+.social-request h3 { margin:0;color:#fff4c9;font-size:18px; }
+.social-request p { margin:4px 0 0;color:#f0dfbd;font-size:10px;line-height:1.45; }
+.social-request .social-inline-actions { grid-column:1/-1;margin-top:9px; }
+.social-request .royale-button { flex:1;min-height:42px;padding:7px 10px;font-size:14px; }
+.social-inline-actions { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+.social-inline-actions .text-button { min-height:32px;padding:5px 8px; }
+.social-recovery { display:grid;grid-template-columns:34px minmax(0,1fr);gap:7px 9px;padding:12px;border:1px solid #f3a1a879;border-radius:10px;background:#6c2f3b8c; }
+.social-recovery>svg { color:#ffbec2; }
+.social-recovery strong { font-size:13px; }
+.social-recovery p { margin:4px 0;color:#ffd7da;font-size:10px;line-height:1.45; }
+.social-recovery .social-inline-actions { grid-column:1/-1;margin-top:5px; }
+.danger-text { color:#ffb4b9!important; }
+.danger-button { border-color:#ff9da6;background:#963e4b;box-shadow:none; }
+.social-error,.social-notice { display:flex;align-items:center;gap:8px;margin:9px 0;padding:9px 10px;border:1px solid #ef979f70;border-radius:8px;background:#753440;color:#ffd9dc;font-size:10px;font-weight:800;line-height:1.4; }
+.social-notice { border-color:#9bdc7a70;background:#356141;color:#e6ffd9; }
+.social-error>span,.social-notice>span { flex:1; }
+.social-error>button:last-child,.social-notice>button:last-child { margin-left:auto;padding:1px;border:0;background:none;font-size:20px;line-height:1; }
+.social-error .small-button { padding:5px 8px;font-size:9px;box-shadow:none;white-space:nowrap; }
+.social-loading { padding:35px 10px;color:#c5d8e8;text-align:center;font-size:12px;font-weight:800; }
+.social-confirm { margin-top:8px;padding:11px;border:1px solid #ee909a70;border-radius:9px;background:#5e303b; }
+.social-confirm strong { font-size:12px; }
+.social-confirm p { margin:4px 0 9px;color:#eabfc3;font-size:9px; }
+.social-invite { padding:10px;border:1px solid #6e8da765;border-radius:10px;background:#15344fa8; }
+.social-invite.incoming { border-color:#c39b5075;background:linear-gradient(110deg,#543f258a,#15344fa8 55%); }
+.social-invite-top { display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:7px; }
+.social-direction { padding:3px 5px;border-radius:4px;background:#0c263d;color:#9fbbd1;font-size:8px;font-weight:900;text-transform:uppercase; }
+.social-invite-top strong { overflow:hidden;font-size:12px;text-overflow:ellipsis;white-space:nowrap; }
+.social-invite-top small { color:#a9c1d5;font-size:8px;font-weight:800; }
+.social-invite>p { margin:7px 0;color:#bcd0e1;font-size:9px;line-height:1.4; }
+.social-invite .small-button { min-height:32px;padding:6px 9px;font-size:10px;box-shadow:none; }
+.accept-button { border-color:#c5ee8b;background:#4f8234; }
+.social-history { margin-top:8px;color:#abc3d7;font-size:10px; }
+.social-history summary { padding:5px 0;cursor:pointer;font-weight:800; }
+.social-history>div { display:flex;justify-content:space-between;padding:5px 2px;border-top:1px solid #6d8ba333; }
+.social-history small { color:#88a5bd; }
+.social-link-section>.small-button { box-shadow:none; }
+.social-link-output,.social-paste label { display:block;color:#bed1e1;font-size:10px;font-weight:800; }
+.social-link-output>div { display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-top:6px; }
+.social-link-output input { min-width:0;font-size:10px; }
+.social-link-output .small-button { padding:7px 9px;box-shadow:none; }
+.social-link-ready>.text-button { width:100%;margin-top:5px;padding:6px;color:#ffe08a; }
+.social-paste { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:7px;margin-top:12px; }
+.social-paste input { display:block;width:100%;margin-top:6px;font-size:10px; }
+.social-paste>.small-button { min-height:39px;padding:7px 9px;box-shadow:none;font-size:10px; }
+.social-legacy { margin-top:16px;padding-top:12px;border-top:1px solid #7592aa3d;text-align:center; }
+.social-legacy>span { display:block;color:#8faac0;font-size:9px; }
+.social-legacy .text-button { width:100%;margin-top:5px;padding:7px;color:#ffe18d; }
+.social-toolbar-button { position:relative; }
+.social-toolbar-badge { position:absolute;right:-5px;top:-6px;display:grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border:1px solid #ffd0d3;border-radius:10px;background:#d44b59;color:#fff;font-size:9px;font-weight:900;box-shadow:0 2px 0 #702b36; }
+.scene-toolbar-actions { display:flex;align-items:center;gap:7px; }
+.home-links { flex-wrap:wrap;row-gap:10px; }
+.finish-heading.export-failed .victory-shield { background:linear-gradient(#f4bd6b,#c77931);border-color:#ffe0a1;box-shadow:0 5px 0 #6d3a23; }
+.finish-heading.export-failed p { margin-inline:auto;max-width:34ch;color:#ffd5bd;line-height:1.5; }
+
+@media (max-width:359px) {
+  .social-modal { padding:14px; }
+  .social-row { grid-template-columns:32px minmax(0,1fr) 30px; }
+  .social-avatar { width:32px;height:35px; }
+  .social-challenge { grid-column:2/4;width:100%; }
+  .social-remove { grid-column:3;grid-row:1; }
+  .social-paste { grid-template-columns:1fr; }
+  .social-paste>.small-button { width:100%; }
+}
+
+@media (max-height:640px) and (max-width:699px) {
+  .social-modal { max-height:calc(100dvh - 20px);padding:12px; }
+  .social-modal .modal-heading { margin-bottom:9px;padding-bottom:9px; }
+  .social-privacy { margin-bottom:8px;padding:7px 8px; }
+  .social-section { margin-top:10px;padding-top:10px; }
+}

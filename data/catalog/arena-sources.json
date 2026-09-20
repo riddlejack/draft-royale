@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-09-05",
+  "generatedAt": "2026-09-05T21:26:33.930Z",
+  "output": "data/catalog/arena-catalog.json",
+  "scope": {
+    "included": "All normal playable battle-card identities and released base, Evolution, Hero, or Champion forms available by 2026-09-05.",
+    "excluded": "Tower troops, temporary/event Super cards, and content first released after 2026-09-05."
+  },
+  "counts": {
+    "cards": 122,
+    "forms": 180,
+    "base": 114,
+    "evolution": 42,
+    "hero": 16,
+    "champion": 8
+  },
+  "baseline": {
+    "authority": "primary",
+    "sourceType": "Official Clash Royale API snapshot",
+    "file": "data/catalog/official-cards.snapshot.json",
+    "upstream": "https://proxy.royaleapi.dev/v1/cards?limit=300 using official Clash Royale API token; token omitted",
+    "generatedAt": "2026-06-25T07:56:39.224Z",
+    "includedBattleCards": 121,
+    "excludedTowerTroops": [
+      {
+        "id": 159000000,
+        "name": "Tower Princess"
+      },
+      {
+        "id": 159000001,
+        "name": "Cannoneer"
+      },
+      {
+        "id": 159000002,
+        "name": "Dagger Duchess"
+      },
+      {
+        "id": 159000004,
+        "name": "Royal Chef"
+      }
+    ],
+    "note": "The token-free refresh never calls the authenticated API or prints credentials. The reviewed July/August changes below advance this snapshot to the cutoff."
+  },
+  "primarySources": [
+    {
+      "id": "supercell-ronin-release",
+      "publisher": "Supercell / Clash Royale",
+      "title": "New Season: Honor & Exile",
+      "publishedAt": "2026-07-06",
+      "url": "https://supercell.com/en/games/clashroyale/blog/release-notes/new-season-honor-and-exile/",
+      "supports": [
+        "Ronin was released by the September 5 cutoff",
+        "Ronin is a Legendary troop"
+      ]
+    },
+    {
+      "id": "supercell-august-season",
+      "publisher": "Supercell / Clash Royale",
+      "title": "New Season: K.H.A.O.S",
+      "publishedAt": "2026-08-03",
+      "url": "https://supercell.com/en/games/clashroyale/blog/news/new-season-k-h-a-o-s/",
+      "supports": [
+        "Hero Valkyrie",
+        "Hero Berserker",
+        "Elite Barbarians Evolution"
+      ]
+    },
+    {
+      "id": "supercell-august-balance",
+      "publisher": "Supercell / Clash Royale",
+      "title": "August Balance Changes",
+      "publishedAt": "2026-08-04",
+      "url": "https://supercell.com/en/games/clashroyale/blog/news/final-august-balance-changes-826/",
+      "supports": [
+        "Void changed from 3 Elixir to 5 Elixir in the live August update"
+      ]
+    },
+    {
+      "id": "supercell-slot-rework",
+      "publisher": "Supercell / Clash Royale",
+      "title": "Mid-March Update",
+      "publishedAt": "2026-03-16",
+      "url": "https://supercell.com/en/games/clashroyale/blog/news/mid-march-update/",
+      "supports": [
+        "One Evolution, one Hero/Champion, and one Wild slot",
+        "A dual-form card switches its active form in the Wild slot"
+      ]
+    },
+    {
+      "id": "supercell-two-champions",
+      "publisher": "Supercell / Clash Royale",
+      "title": "March Update 2026",
+      "publishedAt": "2026-02-23",
+      "url": "https://supercell.com/en/games/clashroyale/blog/release-notes/march-update-2026/",
+      "supports": [
+        "Two Champion/Hero cards can coexist via the Hero and Wild slots"
+      ]
+    },
+    {
+      "id": "supercell-september-future-release",
+      "publisher": "Supercell / Clash Royale",
+      "title": "New Season: Minion Academy!",
+      "publishedAt": "2026-09-07",
+      "url": "https://supercell.com/en/games/clashroyale/blog/release-notes/new-season-minion-academy/",
+      "supports": [
+        "Minion Giant and Hero Ice Wizard release after the September 5 cutoff and are excluded"
+      ]
+    }
+  ],
+  "supplementalSources": [
+    {
+      "id": "supercell-support-ronin",
+      "authority": "primary",
+      "publisher": "Supercell Support",
+      "title": "What's New? - July 2026",
+      "publishedAt": "2026-07-01",
+      "url": "https://support.clashroyale.com/hc/en-us/articles/52628613095835-What-s-New-July-2026",
+      "supports": [
+        "Ronin is Legendary and costs 5 Elixir"
+      ],
+      "accessNote": "Primary source is public but rejects unattended fetches; reviewed in browser on 2026-09-05."
+    },
+    {
+      "id": "noff-current-card-data",
+      "authority": "supplemental",
+      "publisher": "Noff.gg",
+      "title": "Clash Royale Deck Checker embedded card data",
+      "retrievedAt": "2026-09-05",
+      "url": "https://www.noff.gg/clash-royale/deck-checker",
+      "supports": [
+        "Ronin card ID is 26000106"
+      ],
+      "accessNote": "Reviewed from the current rendered page's embedded public card object; the official API snapshot predates Ronin."
+    }
+  ],
+  "reviewedChanges": [
+    {
+      "status": "Verified",
+      "cardKey": "ronin",
+      "change": "Added released base battle card",
+      "effectiveAt": "2026-07-06",
+      "fields": {
+        "id": 26000106,
+        "elixir": 5,
+        "rarity": "legendary",
+        "kind": "troop"
+      },
+      "sources": [
+        "supercell-ronin-release",
+        "supercell-support-ronin",
+        "noff-current-card-data"
+      ]
+    },
+    {
+      "status": "Verified",
+      "cardKey": "void",
+      "change": "Elixir cost updated",
+      "effectiveAt": "2026-08-04",
+      "before": 3,
+      "after": 5,
+      "sources": [
+        "supercell-august-balance"
+      ]
+    },
+    {
+      "status": "Verified",
+      "cardKey": "elite-barbarians",
+      "change": "Evolution form added",
+      "effectiveAt": "2026-08-03",
+      "sources": [
+        "supercell-august-season",
+        "supercell-august-balance"
+      ]
+    },
+    {
+      "status": "Verified",
+      "cardKey": "valkyrie",
+      "change": "Hero form added; existing Evolution retained",
+      "effectiveAt": "2026-08-03",
+      "sources": [
+        "supercell-august-season"
+      ]
+    },
+    {
+      "status": "Verified",
+      "cardKey": "berserker",
+      "change": "Hero form added",
+      "effectiveAt": "2026-08-03",
+      "sources": [
+        "supercell-august-season",
+        "supercell-august-balance"
+      ]
+    }
+  ],
+  "cutoffExclusions": [
+    {
+      "status": "Verified",
+      "item": "Minion Giant",
+      "reason": "First released 2026-09-07, two days after the cutoff.",
+      "source": "supercell-september-future-release"
+    },
+    {
+      "status": "Verified",
+      "item": "Hero Ice Wizard",
+      "reason": "First released 2026-09-07, two days after the cutoff.",
+      "source": "supercell-september-future-release"
+    }
+  ],
+  "slotRules": {
+    "status": "Verified",
+    "effectiveAt": "2026-03-16",
+    "evolutionSlots": 1,
+    "heroOrChampionSlots": 1,
+    "wildSlots": 1,
+    "wildAllows": [
+      "evolution",
+      "hero",
+      "champion"
+    ],
+    "twoChampionsOrHeroes": "allowed using the Hero and Wild slots",
+    "dualEvolutionHeroCard": "Supercell documents one card in the Wild slot switching between its unlocked Evolution and Hero abilities.",
+    "simultaneousDuplicateBaseIdentity": {
+      "status": "Open",
+      "finding": "The official rule does not explicitly discuss duplicating one base identity into two deck positions. The published flow describes switching one Wild-slot card between forms, so this catalog exposes mutually exclusive form choices on one identity."
+    },
+    "sources": [
+      "supercell-slot-rework",
+      "supercell-two-champions"
+    ]
+  },
+  "modelingNotes": [
+    {
+      "status": "Reported",
+      "cardKey": "mirror",
+      "note": "ArenaCard requires a number. The catalog carries the legacy public-data value 1, representing Mirror's +1 surcharge; actual deployment cost depends on the previous card."
+    },
+    {
+      "status": "Verified",
+      "cardKey": "spirit-empress",
+      "note": "The API's canonical 6-Elixir value is retained. Spirit Empress also has a 3-Elixir ground deployment; ArenaCard has one numeric elixir field and no separate stance form."
+    }
+  ],
+  "deckLinks": {
+    "status": "Open",
+    "confirmed": "Public copyDeck links carry eight ordered base card IDs and an optional Tower Troop ID.",
+    "unresolved": "No current first-party documentation was found for encoding Evolution/Hero/Champion choices. Public links expose a slots vector, but its current three-slot form semantics are not documented reliably.",
+    "implementationGuidance": "Keep exporting ordered base IDs. Do not guess form markers; show selected forms beside the link so the player can set the Evolution, Hero, and Wild slots in game."
+  },
+  "assets": {
+    "required": 180,
+    "verifiedThisRun": 180,
+    "changedThisRun": 0,
+    "sources": {
+      "officialApiCdn": "Official iconUrls from the June 25 API snapshot, plus validated Hero CDN URLs for Valkyrie and Berserker.",
+      "officialNewsCdn": "Official Supercell article artwork for Ronin and Elite Barbarians Evolution, whose current icon URLs were absent from the snapshot."
+    },
+    "verification": "Every referenced file returned HTTP 200 and passed PNG signature/IHDR dimension checks."
+  },
+  "refresh": {
+    "command": "node scripts/refresh-arena-catalog.mjs",
+    "offlineCommand": "node scripts/refresh-arena-catalog.mjs --offline",
+    "sourceChecks": [
+      {
+        "id": "supercell-ronin-release",
+        "status": "verified",
+        "bytes": 50283
+      },
+      {
+        "id": "supercell-august-season",
+        "status": "verified",
+        "bytes": 52762
+      },
+      {
+        "id": "supercell-august-balance",
+        "status": "verified",
+        "bytes": 150415
+      },
+      {
+        "id": "supercell-slot-rework",
+        "status": "verified",
+        "bytes": 79790
+      },
+      {
+        "id": "supercell-two-champions",
+        "status": "verified",
+        "bytes": 121132
+      },
+      {
+        "id": "supercell-september-future-release",
+        "status": "verified",
+        "bytes": 76257
+      }
+    ]
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "asOfLocal": "2026-09-05 America/Chicago",
+  "asOfUtc": "2026-09-06",
+  "mode": "C.H.A.O.S Infinite Elixir",
+  "status": "Reported mode-specific whitelist with user-reported exclusions corroborated by the source",
+  "count": 51,
+  "baseCardsOnly": true,
+  "modeSpecificSource": {
+    "url": "https://royaletracker.gg/best-decks/chaos-infinite-elixir",
+    "retrievedAt": "2026-09-06T02:16:55Z",
+    "pageLatestDataLabel": "Sep 6, 2026",
+    "dateModified": "2026-09-06T01:18:21.553Z",
+    "rawSnapshotPath": "/tmp/royaletracker-chaos.html",
+    "rawSnapshotBytes": 656320,
+    "rawSnapshotSha256": "43e48157aab5ffc959aca748fcf7cf280cff99fd71084930ce11e24157b12062",
+    "evidence": "The dedicated chaos-infinite-elixir page states that the live mode has a restricted 51-card pool with no Evolutions and no Heroes, and enumerates 51 ranked modifier identities.",
+    "championScope": "No Champion identity appears in the complete 51-identity list. This is an inference from the exhaustive list, not a quoted no-Champions statement."
+  },
+  "officialSeason": {
+    "url": "https://supercell.com/en/games/clashroyale/blog/news/new-season-k-h-a-o-s/",
+    "status": "Verified official",
+    "evidence": "Supercell lists C.H.A.O.S Infinite Elixir for Aug 31 through Sep 7, 2026. It does not publish the card whitelist."
+  },
+  "officialHotfix": {
+    "url": "https://supercell.com/en/games/clashroyale/blog/release-notes/new-season-minion-academy/",
+    "status": "Verified official",
+    "latestRelevantHotfix": "2026-09-03T13:00:00Z",
+    "evidence": "Supercell records C.H.A.O.S hotfixes but does not publish the Infinite Elixir card whitelist."
+  },
+  "supportedKeyToId": {
+    "royal-hogs": 26000059,
+    "ronin": 26000106,
+    "skeleton-barrel": 26000056,
+    "graveyard": 28000010,
+    "giant": 26000003,
+    "the-log": 28000011,
+    "fireball": 28000000,
+    "tesla": 27000006,
+    "rage": 28000002,
+    "knight": 26000000,
+    "skeleton-army": 26000012,
+    "poison": 28000009,
+    "rocket": 28000003,
+    "barbarian-barrel": 28000015,
+    "berserker": 26000102,
+    "mortar": 27000002,
+    "mega-knight": 26000055,
+    "musketeer": 26000014,
+    "suspicious-bush": 26000097,
+    "lava-hound": 26000029,
+    "pekka": 26000004,
+    "royal-giant": 26000024,
+    "firecracker": 26000064,
+    "electro-wizard": 26000042,
+    "ram-rider": 26000051,
+    "wizard": 26000017,
+    "executioner": 26000045,
+    "x-bow": 27000008,
+    "rascals": 26000053,
+    "three-musketeers": 26000028,
+    "princess": 26000026,
+    "baby-dragon": 26000015,
+    "inferno-dragon": 26000037,
+    "night-witch": 26000048,
+    "elixir-golem": 26000067,
+    "arrows": 28000001,
+    "inferno-tower": 27000003,
+    "zap": 28000008,
+    "electro-spirit": 26000084,
+    "hunter": 26000044,
+    "bandit": 26000046,
+    "mother-witch": 26000083,
+    "heal-spirit": 28000016,
+    "valkyrie": 26000011,
+    "rune-giant": 26000101,
+    "witch": 26000007,
+    "zappies": 26000052,
+    "ice-wizard": 26000023,
+    "dark-prince": 26000027,
+    "elite-barbarians": 26000043,
+    "dart-goblin": 26000040
+  },
+  "sourceDisplayAliases": {
+    "Axe Man": {
+      "key": "executioner",
+      "id": 26000045
+    },
+    "Dark Witch": {
+      "key": "night-witch",
+      "id": 26000048
+    },
+    "Assassin": {
+      "key": "bandit",
+      "id": 26000046
+    },
+    "Giant Buffer": {
+      "key": "rune-giant",
+      "id": 26000101
+    },
+    "Mini Sparkys": {
+      "key": "zappies",
+      "id": 26000052
+    },
+    "Angry Barbarians": {
+      "key": "elite-barbarians",
+      "id": 26000043
+    }
+  },
+  "excludedFromPreviousBroad66": [
+    {
+      "key": "barbarian-hut",
+      "id": 27000005,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "fisherman",
+      "id": 26000061,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "flying-machine",
+      "id": 26000057,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "furnace",
+      "id": 27000010,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "giant-snowball",
+      "id": 28000017,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "goblin-barrel",
+      "id": 28000004,
+      "status": "User-reported and corroborated by absence from the mode-specific complete 51"
+    },
+    {
+      "key": "goblin-demolisher",
+      "id": 26000095,
+      "status": "User-reported and corroborated by absence from the mode-specific complete 51"
+    },
+    {
+      "key": "goblin-drill",
+      "id": 27000013,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "goblin-giant",
+      "id": 26000060,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "goblin-hut",
+      "id": 27000001,
+      "status": "User-reported and corroborated by absence from the mode-specific complete 51"
+    },
+    {
+      "key": "golem",
+      "id": 26000009,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "ice-spirit",
+      "id": 26000030,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "royal-delivery",
+      "id": 28000018,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "tombstone",
+      "id": 27000009,
+      "status": "Reported absent from complete mode-specific 51"
+    },
+    {
+      "key": "vines",
+      "id": 28000026,
+      "status": "User-reported and corroborated by absence from the mode-specific complete 51"
+    }
+  ],
+  "broadModifierUnion": {
+    "source": "https://royaleapi.com/cards/popular?cat=CHAOS_Mod&mode=grid&sort=rating&time=7d",
+    "count": 66,
+    "status": "Derived multi-variant modifier union",
+    "policy": "Retained only for other explicitly named Chaos variants. It is not used for Infinite Elixir or its saved legacy alias."
+  },
+  "modePredicate": {
+    "exactCurrentLabel": "Chaos Infinite Elixir",
+    "punctuatedCurrentLabel": "C.H.A.O.S Infinite Elixir",
+    "intentionalLegacyAlias": "Chaos friendly battle",
+    "genericBareChaosPolicy": "Ambiguous bare and differently named Chaos variants retain the broad modifier union; they do not inherit the 51-card/base-only contract."
+  },
+  "policy": "Infinite Elixir deals only the 51 listed identities and only base forms. Existing active boards are preserved. Completed legacy decks with an unsupported identity or non-base form are shown but export is blocked with an actionable error.",
+  "sourceDisplayAliasesStatus": "Derived normalization",
+  "sourceDisplayAliasesEvidence": "RoyaleTracker names these six Chaos units and embeds ordinary card identities in decks using their modifiers. The mapping uses repeated deck association plus the corresponding base-card identity; the page does not publish direct alias-to-card IDs."
+}

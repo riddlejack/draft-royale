@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-09T02:05:11Z",
+  "collections": [
+    {
+      "id": "classic-archetypes",
+      "title": "Hall of Fame",
+      "mode": "classic",
+      "description": "Fifteen familiar named archetype recipes linked to exact RoyaleAPI deck pages. The links verify each eight-card composition; Hall of Fame selection is editorial and does not claim a deck's age, current strength, or place in today's event pool.",
+      "decks": [
+        {
+          "id": "hall-hog-26-cycle",
+          "name": "Hog 2.6 Cycle",
+          "mode": "classic",
+          "cards": ["cannon", "fireball", "hog-rider", "ice-golem", "ice-spirit", "musketeer", "skeletons", "the-log"],
+          "forms": {"cannon": "base", "fireball": "base", "hog-rider": "base", "ice-golem": "base", "ice-spirit": "base", "musketeer": "base", "skeletons": "base", "the-log": "base"},
+          "tags": ["hall-of-fame", "cycle", "hog-rider", "2.6"],
+          "description": "Use one-card defenses and Musketeer support to return to Hog Rider before the opponent's counter is ready. This canonical recipe also appears in Supercell's 2018 set under Ride the HogCycle; this entry preserves the familiar community name.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Hog 2.6 Cycle deck statistics",
+            "url": "https://royaleapi.com/decks/stats/cannon%2Cfireball%2Chog-rider%2Cice-golem%2Cice-spirit%2Cmusketeer%2Cskeletons%2Cthe-log?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-xbow-29-cycle",
+          "name": "X-Bow 2.9 Cycle",
+          "mode": "classic",
+          "cards": ["archers", "fireball", "ice-golem", "ice-spirit", "skeletons", "tesla", "the-log", "x-bow"],
+          "forms": {"archers": "base", "fireball": "base", "ice-golem": "base", "ice-spirit": "base", "skeletons": "base", "tesla": "base", "the-log": "base", "x-bow": "base"},
+          "tags": ["hall-of-fame", "cycle", "siege", "2.9"],
+          "description": "Protect X-Bow with Tesla and Archers, then use the light cycle to reach the next siege attempt. The 2.9 label reflects this exact historical roster at current catalog costs.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · X-Bow 2.9 Cycle deck statistics",
+            "url": "https://royaleapi.com/decks/stats/archers%2Cfireball%2Cice-golem%2Cice-spirit%2Cskeletons%2Ctesla%2Cthe-log%2Cx-bow?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-xbow-30-cycle",
+          "name": "X-Bow 3.0 Cycle",
+          "mode": "classic",
+          "cards": ["archers", "fireball", "ice-spirit", "knight", "skeletons", "tesla", "the-log", "x-bow"],
+          "forms": {"archers": "base", "fireball": "base", "ice-spirit": "base", "knight": "base", "skeletons": "base", "tesla": "base", "the-log": "base", "x-bow": "base"},
+          "tags": ["hall-of-fame", "cycle", "siege", "3.0"],
+          "description": "Knight supplies a sturdier screen than the 2.9 variant while Archers and Tesla anchor repeated X-Bow defenses and counterattacks.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · X-Bow 3.0 Cycle deck statistics",
+            "url": "https://royaleapi.com/decks/stats/archers%2Cfireball%2Cice-spirit%2Cknight%2Cskeletons%2Ctesla%2Cthe-log%2Cx-bow?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-loon-miner-29-cycle",
+          "name": "Balloon Miner 2.9 Cycle",
+          "mode": "classic",
+          "cards": ["balloon", "barbarian-barrel", "bomb-tower", "giant-snowball", "ice-golem", "miner", "musketeer", "skeletons"],
+          "forms": {"balloon": "base", "barbarian-barrel": "base", "bomb-tower": "base", "giant-snowball": "base", "ice-golem": "base", "miner": "base", "musketeer": "base", "skeletons": "base"},
+          "tags": ["hall-of-fame", "cycle", "balloon", "2.9"],
+          "description": "Cycle Balloon pressure behind Ice Golem, send Miner to tanks or damaged towers, and preserve Musketeer through low-cost defenses.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Loon Miner 2.9 Cycle deck statistics",
+            "url": "https://royaleapi.com/decks/stats/balloon%2Cbarbarian-barrel%2Cbomb-tower%2Cgiant-snowball%2Cice-golem%2Cminer%2Cmusketeer%2Cskeletons?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-classic-log-bait",
+          "name": "Classic Log Bait",
+          "mode": "classic",
+          "cards": ["goblin-barrel", "goblin-gang", "ice-spirit", "inferno-tower", "knight", "princess", "rocket", "the-log"],
+          "forms": {"goblin-barrel": "base", "goblin-gang": "base", "ice-spirit": "base", "inferno-tower": "base", "knight": "base", "princess": "base", "rocket": "base", "the-log": "base"},
+          "tags": ["hall-of-fame", "bait", "control", "goblin-barrel"],
+          "description": "Force out the opponent's small spell with Princess and Goblin Gang, then punish the missing answer with Goblin Barrel while Rocket closes tight games.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Log Bait deck statistics",
+            "url": "https://royaleapi.com/decks/stats/goblin-barrel%2Cgoblin-gang%2Cice-spirit%2Cinferno-tower%2Cknight%2Cprincess%2Crocket%2Cthe-log?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-splashyard-bomb-tower",
+          "name": "Splashyard",
+          "mode": "classic",
+          "cards": ["baby-dragon", "barbarian-barrel", "bomb-tower", "graveyard", "ice-wizard", "knight", "poison", "tornado"],
+          "forms": {"baby-dragon": "base", "barbarian-barrel": "base", "bomb-tower": "base", "graveyard": "base", "ice-wizard": "base", "knight": "base", "poison": "base", "tornado": "base"},
+          "tags": ["hall-of-fame", "control", "graveyard", "splashyard"],
+          "description": "Absorb pushes with layered splash damage and Tornado, then turn surviving defenders into a Graveyard and Poison counterpush.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Graveyard Ice Wizard Baby Dragon Tornado deck statistics",
+            "url": "https://royaleapi.com/decks/stats/baby-dragon%2Cbarbarian-barrel%2Cbomb-tower%2Cgraveyard%2Cice-wizard%2Cknight%2Cpoison%2Ctornado?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-giant-double-prince",
+          "name": "Giant Double Prince",
+          "mode": "classic",
+          "cards": ["dark-prince", "electro-wizard", "fireball", "giant", "mega-minion", "miner", "prince", "zap"],
+          "forms": {"dark-prince": "base", "electro-wizard": "base", "fireball": "base", "giant": "base", "mega-minion": "base", "miner": "base", "prince": "base", "zap": "base"},
+          "tags": ["hall-of-fame", "beatdown", "giant", "double-prince"],
+          "description": "Build a Giant counterpush in front of the two Princes, using Miner to remove support troops or add pressure when the opponent commits heavily.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Giant Double Prince deck statistics",
+            "url": "https://royaleapi.com/decks/stats/dark-prince%2Celectro-wizard%2Cfireball%2Cgiant%2Cmega-minion%2Cminer%2Cprince%2Czap?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-mortar-miner-bait",
+          "name": "Mortar Miner Bait",
+          "mode": "classic",
+          "cards": ["bats", "fireball", "goblin-gang", "miner", "mortar", "rascals", "spear-goblins", "the-log"],
+          "forms": {"bats": "base", "fireball": "base", "goblin-gang": "base", "miner": "base", "mortar": "base", "rascals": "base", "spear-goblins": "base", "the-log": "base"},
+          "tags": ["hall-of-fame", "bait", "siege", "miner"],
+          "description": "Split the opponent's answers across cheap swarms, use Mortar as offense or defense, and finish damage with Miner once counters are out of cycle.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Mortar Miner Bats Bait deck statistics",
+            "url": "https://royaleapi.com/decks/stats/bats%2Cfireball%2Cgoblin-gang%2Cminer%2Cmortar%2Crascals%2Cspear-goblins%2Cthe-log?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-pekka-bridge-spam",
+          "name": "P.E.K.K.A Bridge Spam",
+          "mode": "classic",
+          "cards": ["bandit", "battle-ram", "electro-wizard", "magic-archer", "pekka", "poison", "royal-ghost", "zap"],
+          "forms": {"bandit": "base", "battle-ram": "base", "electro-wizard": "base", "magic-archer": "base", "pekka": "base", "poison": "base", "royal-ghost": "base", "zap": "base"},
+          "tags": ["hall-of-fame", "bridge-spam", "control", "pekka"],
+          "description": "Defend with P.E.K.K.A and Electro Wizard, then pressure both lanes with Battle Ram, Bandit, and Royal Ghost before the opponent can rebuild elixir.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · P.E.K.K.A Bandit Electro Wizard Bridge Spam deck statistics",
+            "url": "https://royaleapi.com/decks/stats/bandit%2Cbattle-ram%2Celectro-wizard%2Cmagic-archer%2Cpekka%2Cpoison%2Croyal-ghost%2Czap?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-icebow",
+          "name": "IceBow",
+          "mode": "classic",
+          "cards": ["ice-wizard", "knight", "rocket", "skeletons", "tesla", "the-log", "tornado", "x-bow"],
+          "forms": {"ice-wizard": "base", "knight": "base", "rocket": "base", "skeletons": "base", "tesla": "base", "the-log": "base", "tornado": "base", "x-bow": "base"},
+          "tags": ["hall-of-fame", "control", "siege", "rocket-cycle"],
+          "description": "Slow and group attackers with Ice Wizard and Tornado, seek safe X-Bow locks, and use Rocket as the alternate finish when the siege lane stays closed.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · X-Bow Ice Wizard Tornado deck statistics",
+            "url": "https://royaleapi.com/decks/stats/ice-wizard%2Cknight%2Crocket%2Cskeletons%2Ctesla%2Cthe-log%2Ctornado%2Cx-bow?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-golem-clone",
+          "name": "Golem Clone",
+          "mode": "classic",
+          "cards": ["arrows", "baby-dragon", "bats", "clone", "golem", "lumberjack", "night-witch", "skeleton-army"],
+          "forms": {"arrows": "base", "baby-dragon": "base", "bats": "base", "clone": "base", "golem": "base", "lumberjack": "base", "night-witch": "base", "skeleton-army": "base"},
+          "tags": ["hall-of-fame", "beatdown", "clone", "golem"],
+          "description": "Stack death-spawn troops behind Golem and time Clone after the opponent spends splash damage, creating a high-risk push that can overwhelm a tower at once.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Golem Baby Dragon Bats Clone deck statistics",
+            "url": "https://royaleapi.com/decks/stats/arrows%2Cbaby-dragon%2Cbats%2Cclone%2Cgolem%2Clumberjack%2Cnight-witch%2Cskeleton-army?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-royal-hogs-recruits",
+          "name": "Royal Hogs Recruits Fireball Bait",
+          "mode": "classic",
+          "cards": ["arrows", "barbarian-barrel", "fireball", "flying-machine", "goblin-cage", "royal-hogs", "royal-recruits", "zappies"],
+          "forms": {"arrows": "base", "barbarian-barrel": "base", "fireball": "base", "flying-machine": "base", "goblin-cage": "base", "royal-hogs": "base", "royal-recruits": "base", "zappies": "base"},
+          "tags": ["hall-of-fame", "split-lane", "fireball-bait", "royal-hogs"],
+          "description": "Split Royal Recruits to build two lanes, then pair Royal Hogs with the side whose Flying Machine or Zappies survived the opponent's spell.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Royal Hogs Recruits Flying Machine Zappies deck statistics",
+            "url": "https://royaleapi.com/decks/stats/arrows%2Cbarbarian-barrel%2Cfireball%2Cflying-machine%2Cgoblin-cage%2Croyal-hogs%2Croyal-recruits%2Czappies?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-elixir-golem-double-dragon",
+          "name": "Elixir Golem Double Dragon",
+          "mode": "classic",
+          "cards": ["baby-dragon", "battle-healer", "electro-dragon", "elixir-golem", "heal-spirit", "night-witch", "rage", "tornado"],
+          "forms": {"baby-dragon": "base", "battle-healer": "base", "electro-dragon": "base", "elixir-golem": "base", "heal-spirit": "base", "night-witch": "base", "rage": "base", "tornado": "base"},
+          "tags": ["hall-of-fame", "beatdown", "elixir-golem", "battle-healer"],
+          "description": "Group defenders with Tornado while Battle Healer and the two Dragons sustain a compact Elixir Golem push; the deck trades future elixir for immediate momentum.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Elixir Golem Double Dragon Night Witch deck statistics",
+            "url": "https://royaleapi.com/decks/stats/baby-dragon%2Cbattle-healer%2Celectro-dragon%2Celixir-golem%2Cheal-spirit%2Cnight-witch%2Crage%2Ctornado?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-lavaloon-miner-double-dragon",
+          "name": "LavaLoon Miner Double Dragon",
+          "mode": "classic",
+          "cards": ["arrows", "balloon", "barbarians", "inferno-dragon", "lava-hound", "miner", "skeleton-dragons", "zap"],
+          "forms": {"arrows": "base", "balloon": "base", "barbarians": "base", "inferno-dragon": "base", "lava-hound": "base", "miner": "base", "skeleton-dragons": "base", "zap": "base"},
+          "tags": ["hall-of-fame", "air-beatdown", "lava-hound", "balloon"],
+          "description": "Build an air push behind Lava Hound, send Balloon once air counters commit, and use Miner to tank for surviving pups or remove a key defender.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · LavaLoon Miner Double Dragon deck statistics",
+            "url": "https://royaleapi.com/decks/stats/arrows%2Cballoon%2Cbarbarians%2Cinferno-dragon%2Clava-hound%2Cminer%2Cskeleton-dragons%2Czap?lang=en",
+            "confidence": "verified"
+          }
+        },
+        {
+          "id": "hall-rg-fisherman-hunter",
+          "name": "Royal Giant Fisherman Hunter 3.3",
+          "mode": "classic",
+          "cards": ["electro-spirit", "fisherman", "hunter", "lightning", "royal-ghost", "royal-giant", "skeletons", "the-log"],
+          "forms": {"electro-spirit": "base", "fisherman": "base", "hunter": "base", "lightning": "base", "royal-ghost": "base", "royal-giant": "base", "skeletons": "base", "the-log": "base"},
+          "tags": ["hall-of-fame", "control", "royal-giant", "fisherman"],
+          "description": "Pull tanks into Hunter's close-range burst with Fisherman, then place Royal Giant in front of surviving defenders and reserve Lightning for buildings and support troops.",
+          "source": {
+            "kind": "royaleapi",
+            "label": "RoyaleAPI · Royal Giant Fisherman Hunter 3.3 Cycle deck statistics",
+            "url": "https://royaleapi.com/decks/stats/electro-spirit%2Cfisherman%2Chunter%2Clightning%2Croyal-ghost%2Croyal-giant%2Cskeletons%2Cthe-log?lang=en",
+            "confidence": "verified"
+          }
+        }
+      ]
+    }
+  ]
+}

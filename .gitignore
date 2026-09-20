@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+data/private/
+data/cache/
+output/
+node_modules/
+**/dist/
+**/dist-types/
+*.tsbuildinfo
+pnpm-debug.log*
+apps/web/public/assets

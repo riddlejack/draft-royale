@@ -1,0 +1,32 @@
+{
+  "name": "draft-royale-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:packages": "pnpm --filter @draft-royale/shared build",
+    "prepare:web-assets": "node scripts/link-web-assets.mjs",
+    "dev": "pnpm prepare:web-assets && pnpm build:packages && pnpm --parallel --filter @draft-royale/server --filter @draft-royale/web dev",
+    "dev:server": "pnpm build:packages && pnpm --filter @draft-royale/server dev",
+    "dev:web": "pnpm --filter @draft-royale/web dev",
+    "build": "pnpm prepare:web-assets && pnpm -r build",
+    "test": "pnpm build:packages && pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "qa:arena": "node scripts/qa-arena-browser.mjs",
+    "migrate:legacy-account": "node scripts/migrate-legacy-account.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "playwright-core": "^1.61.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.47.0",
+    "vitest": "^4.0.13"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  }
+}

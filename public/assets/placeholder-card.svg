@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 300" role="img" aria-label="Card artwork not included">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#203a55"/><stop offset="1" stop-color="#101b2a"/></linearGradient></defs>
+  <rect width="240" height="300" rx="24" fill="url(#g)"/><path d="M120 65l48 28v56c0 39-23 69-48 82-25-13-48-43-48-82V93z" fill="none" stroke="#8fb9dc" stroke-width="10"/><path d="M100 127h40M120 107v40" stroke="#8fb9dc" stroke-width="9" stroke-linecap="round"/><text x="120" y="266" fill="#c5d8e8" font-family="system-ui,sans-serif" font-size="15" text-anchor="middle">ART NOT INCLUDED</text>
+</svg>

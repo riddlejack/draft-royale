@@ -1,0 +1,82 @@
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
+import type { SocialService } from "../social/service.js";
+
+export class AccountError extends Error { constructor(readonly status: number, message: string) { super(message); } }
+export interface ClubAccount { username: string; displayName: string; tag: string; profileId: string }
+type AccountRow = { username: string; display_name: string; tag: string; salt: string; password_hash: string; profile_id: string };
+const initialPlayers = [
+  { displayName: "PlayerOne", tag: "#2PYL0Q8" },
+  { displayName: "PlayerThree", tag: "#9GULPC02" },
+  { displayName: "PlayerTwo", tag: "#8QRJCV2" },
+];
+const accountOf = (row: AccountRow): ClubAccount => ({ username: row.username, displayName: row.display_name, tag: row.tag, profileId: row.profile_id });
+const nameOf = (value: unknown) => {
+  if (typeof value !== "string" || !/^[a-zA-Z0-9_ .-]{2,32}$/.test(value.trim())) throw new AccountError(400, "Use a player name with 2–32 letters, numbers, spaces, or underscores.");
+  return value.trim();
+};
+const tagOf = (value: unknown) => {
+  if (typeof value !== "string") throw new AccountError(400, "Enter your Clash Royale player tag.");
+  const tag = `#${value.replace(/^#/, "").trim().toUpperCase()}`;
+  if (!/^#[0289PYLQGRJCUV]{3,15}$/.test(tag)) throw new AccountError(400, "Enter a valid Clash Royale tag, such as #2PYL0Q8.");
+  return tag;
+};
+
+export function createAccountService(options: { databasePath: string; social: SocialService }) {
+  const db = new DatabaseSync(options.databasePath);
+  db.exec("PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;");
+  db.exec(`CREATE TABLE IF NOT EXISTS club_account_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS club_accounts (username TEXT PRIMARY KEY, display_name TEXT NOT NULL, tag TEXT NOT NULL UNIQUE, salt TEXT NOT NULL, password_hash TEXT NOT NULL, profile_id TEXT NOT NULL UNIQUE);`);
+  db.prepare("INSERT OR IGNORE INTO club_account_meta VALUES('identity_secret',?)").run(randomBytes(32).toString("hex"));
+  const secret = String(db.prepare("SELECT value FROM club_account_meta WHERE key='identity_secret'").get()?.value);
+  const credentialFor = (username: string) => createHmac("sha256", secret).update(`club-profile:${username}`).digest("base64url");
+  const rows = () => db.prepare("SELECT * FROM club_accounts ORDER BY rowid").all() as unknown as AccountRow[];
+  const add = (displayName: string, tag: string, password: string) => {
+    if (rows().length >= 100) throw new AccountError(409, "This friend group has reached 100 players.");
+    const username = displayName.toLowerCase();
+    if (db.prepare("SELECT 1 FROM club_accounts WHERE username=? OR tag=?").get(username, tag)) throw new AccountError(409, "That name or player tag already has an account. Sign in instead.");
+    const salt = randomBytes(16).toString("hex");
+    const hash = scryptSync(password, salt, 32).toString("hex");
+    const profile = options.social.createProfile({ displayName, credentialToken: credentialFor(username) });
+    db.prepare("INSERT INTO club_accounts VALUES(?,?,?,?,?,?)").run(username, displayName, tag, salt, hash, profile.credential.profileId);
+    return accountOf(db.prepare("SELECT * FROM club_accounts WHERE username=?").get(username) as unknown as AccountRow);
+  };
+  for (const player of initialPlayers) if (!db.prepare("SELECT 1 FROM club_accounts WHERE username=?").get(player.displayName.toLowerCase())) add(player.displayName, player.tag, player.displayName);
+  // These three friendships were explicitly requested together. Later players choose who to add in Friends.
+  const friendsSeeded = db.prepare("SELECT 1 FROM club_account_meta WHERE key='friends_seeded'").get();
+  if (!friendsSeeded) for (let i = 0; i < initialPlayers.length; i += 1) for (let j = i + 1; j < initialPlayers.length; j += 1) {
+    const left = initialPlayers[i]!.displayName.toLowerCase();
+    const right = initialPlayers[j]!.displayName.toLowerCase();
+    const a = options.social.authenticate(credentialFor(left));
+    const b = options.social.authenticate(credentialFor(right));
+    if (!options.social.getState(a).friends.some((friend) => friend.id === b.profile.id)) {
+      const link = options.social.createFriendLink(a, { commandId: `club-seed-${left}-${right}` });
+      options.social.acceptFriendLink(b, { token: link.token, commandId: `club-seed-${left}-${right}` });
+    }
+  }
+  db.prepare("INSERT OR IGNORE INTO club_account_meta VALUES('friends_seeded','yes')").run();
+  const login = (input: unknown) => {
+    const body = input as Record<string, unknown> | null;
+    const username = nameOf(body?.username).toLowerCase();
+    const password = typeof body?.password === "string" && body.password.length <= 128 ? body.password : "";
+    const row = db.prepare("SELECT * FROM club_accounts WHERE username=?").get(username) as unknown as AccountRow | undefined;
+    const hash = scryptSync(password, row?.salt ?? "invalid-account-salt", 32);
+    if (!row || !timingSafeEqual(hash, Buffer.from(row.password_hash, "hex"))) throw new AccountError(401, "The player name or password is incorrect.");
+    const session = options.social.createProfile({ displayName: row.display_name, credentialToken: credentialFor(username) });
+    return { ...session, account: accountOf(row) };
+  };
+  const register = (input: unknown) => {
+    const body = input as Record<string, unknown> | null;
+    const displayName = nameOf(body?.displayName);
+    const tag = tagOf(body?.tag);
+    // Casual club sign-in is intentionally the requested player-name password, not ownership verification.
+    add(displayName, tag, displayName);
+    return login({ username: displayName, password: displayName });
+  };
+  const forProfile = (profileId: string) => {
+    const row = db.prepare("SELECT * FROM club_accounts WHERE profile_id=?").get(profileId) as unknown as AccountRow | undefined;
+    return row ? accountOf(row) : null;
+  };
+  return { login, register, forProfile, list: () => rows().map(accountOf), close: () => db.close() };
+}
+export type AccountService = ReturnType<typeof createAccountService>;

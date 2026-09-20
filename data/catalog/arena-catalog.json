@@ -1,0 +1,2535 @@
+{
+  "version": "2026-09-05",
+  "updatedAt": "2026-09-05T17:00:00.000Z",
+  "cards": [
+    {
+      "key": "knight",
+      "id": 26000000,
+      "name": "Knight",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Knight",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Knight Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Knight",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "archers",
+      "id": 26000001,
+      "name": "Archers",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Archers",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Archers Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblins",
+      "id": 26000002,
+      "name": "Goblins",
+      "elixir": 2,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblins",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Goblins",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "giant",
+      "id": 26000003,
+      "name": "Giant",
+      "elixir": 5,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Giant",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Giant",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "pekka",
+      "id": 26000004,
+      "name": "P.E.K.K.A",
+      "elixir": 7,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "P.E.K.K.A",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "P.E.K.K.A Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "minions",
+      "id": 26000005,
+      "name": "Minions",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Minions",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "balloon",
+      "id": 26000006,
+      "name": "Balloon",
+      "elixir": 5,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Balloon",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Balloon",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "witch",
+      "id": 26000007,
+      "name": "Witch",
+      "elixir": 5,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Witch",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Witch Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "barbarians",
+      "id": 26000008,
+      "name": "Barbarians",
+      "elixir": 5,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "barbarian"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Barbarians",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Barbarians Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "golem",
+      "id": 26000009,
+      "name": "Golem",
+      "elixir": 8,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Golem",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "skeletons",
+      "id": 26000010,
+      "name": "Skeletons",
+      "elixir": 1,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Skeletons",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Skeletons Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "valkyrie",
+      "id": 26000011,
+      "name": "Valkyrie",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Valkyrie",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Valkyrie Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Valkyrie",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "skeleton-army",
+      "id": 26000012,
+      "name": "Skeleton Army",
+      "elixir": 3,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Skeleton Army",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Skeleton Army Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "bomber",
+      "id": 26000013,
+      "name": "Bomber",
+      "elixir": 2,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Bomber",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Bomber Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "musketeer",
+      "id": 26000014,
+      "name": "Musketeer",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Musketeer",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Musketeer Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Musketeer",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "baby-dragon",
+      "id": 26000015,
+      "name": "Baby Dragon",
+      "elixir": 4,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "dragon",
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Baby Dragon",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Baby Dragon Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "prince",
+      "id": 26000016,
+      "name": "Prince",
+      "elixir": 5,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Prince",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "wizard",
+      "id": 26000017,
+      "name": "Wizard",
+      "elixir": 5,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "fire"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Wizard",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Wizard Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Wizard",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "mini-pekka",
+      "id": 26000018,
+      "name": "Mini P.E.K.K.A",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Mini P.E.K.K.A",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Mini P.E.K.K.A",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "spear-goblins",
+      "id": 26000019,
+      "name": "Spear Goblins",
+      "elixir": 2,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Spear Goblins",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "giant-skeleton",
+      "id": 26000020,
+      "name": "Giant Skeleton",
+      "elixir": 6,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Giant Skeleton",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "hog-rider",
+      "id": 26000021,
+      "name": "Hog Rider",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Hog Rider",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "minion-horde",
+      "id": 26000022,
+      "name": "Minion Horde",
+      "elixir": 5,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Minion Horde",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Minion Horde Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "ice-wizard",
+      "id": 26000023,
+      "name": "Ice Wizard",
+      "elixir": 3,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "ice"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Ice Wizard",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "royal-giant",
+      "id": 26000024,
+      "name": "Royal Giant",
+      "elixir": 6,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Royal Giant",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Royal Giant Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "guards",
+      "id": 26000025,
+      "name": "Guards",
+      "elixir": 3,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Guards",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "princess",
+      "id": 26000026,
+      "name": "Princess",
+      "elixir": 3,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Princess",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Princess Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "dark-prince",
+      "id": 26000027,
+      "name": "Dark Prince",
+      "elixir": 4,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Dark Prince",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Dark Prince",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "three-musketeers",
+      "id": 26000028,
+      "name": "Three Musketeers",
+      "elixir": 9,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Three Musketeers",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "lava-hound",
+      "id": 26000029,
+      "name": "Lava Hound",
+      "elixir": 7,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Lava Hound",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "ice-spirit",
+      "id": 26000030,
+      "name": "Ice Spirit",
+      "elixir": 1,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "ice",
+        "spirit"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Ice Spirit",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Ice Spirit Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "fire-spirit",
+      "id": 26000031,
+      "name": "Fire Spirit",
+      "elixir": 1,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "fire",
+        "spirit"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Fire Spirit",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "miner",
+      "id": 26000032,
+      "name": "Miner",
+      "elixir": 3,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Miner",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "sparky",
+      "id": 26000033,
+      "name": "Sparky",
+      "elixir": 6,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "electric"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Sparky",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "bowler",
+      "id": 26000034,
+      "name": "Bowler",
+      "elixir": 5,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Bowler",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Bowler",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "lumberjack",
+      "id": 26000035,
+      "name": "Lumberjack",
+      "elixir": 4,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Lumberjack",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Lumberjack Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "battle-ram",
+      "id": 26000036,
+      "name": "Battle Ram",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "barbarian"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Battle Ram",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Battle Ram Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "inferno-dragon",
+      "id": 26000037,
+      "name": "Inferno Dragon",
+      "elixir": 4,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "dragon",
+        "fire",
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Inferno Dragon",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Inferno Dragon Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "ice-golem",
+      "id": 26000038,
+      "name": "Ice Golem",
+      "elixir": 2,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "ice"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Ice Golem",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Ice Golem",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "mega-minion",
+      "id": 26000039,
+      "name": "Mega Minion",
+      "elixir": 3,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Mega Minion",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Mega Minion",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "dart-goblin",
+      "id": 26000040,
+      "name": "Dart Goblin",
+      "elixir": 3,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Dart Goblin",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Dart Goblin Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-gang",
+      "id": 26000041,
+      "name": "Goblin Gang",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Gang",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "electro-wizard",
+      "id": 26000042,
+      "name": "Electro Wizard",
+      "elixir": 4,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "electric"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Electro Wizard",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "elite-barbarians",
+      "id": 26000043,
+      "name": "Elite Barbarians",
+      "elixir": 6,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "barbarian"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Elite Barbarians",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Elite Barbarians Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "hunter",
+      "id": 26000044,
+      "name": "Hunter",
+      "elixir": 4,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Hunter",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Hunter Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "executioner",
+      "id": 26000045,
+      "name": "Executioner",
+      "elixir": 5,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Executioner",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Executioner Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "bandit",
+      "id": 26000046,
+      "name": "Bandit",
+      "elixir": 3,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Bandit",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "royal-recruits",
+      "id": 26000047,
+      "name": "Royal Recruits",
+      "elixir": 7,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Royal Recruits",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Royal Recruits Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "night-witch",
+      "id": 26000048,
+      "name": "Night Witch",
+      "elixir": 4,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Night Witch",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "bats",
+      "id": 26000049,
+      "name": "Bats",
+      "elixir": 2,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Bats",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Bats Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "royal-ghost",
+      "id": 26000050,
+      "name": "Royal Ghost",
+      "elixir": 3,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "noble-royal",
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Royal Ghost",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Royal Ghost Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "ram-rider",
+      "id": 26000051,
+      "name": "Ram Rider",
+      "elixir": 5,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Ram Rider",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "zappies",
+      "id": 26000052,
+      "name": "Zappies",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "electric"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Zappies",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "rascals",
+      "id": 26000053,
+      "name": "Rascals",
+      "elixir": 5,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Rascals",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "cannon-cart",
+      "id": 26000054,
+      "name": "Cannon Cart",
+      "elixir": 5,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "siege-mechanical"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Cannon Cart",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "mega-knight",
+      "id": 26000055,
+      "name": "Mega Knight",
+      "elixir": 7,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Mega Knight",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Mega Knight Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "skeleton-barrel",
+      "id": 26000056,
+      "name": "Skeleton Barrel",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "flying",
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Skeleton Barrel",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Skeleton Barrel Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "flying-machine",
+      "id": 26000057,
+      "name": "Flying Machine",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "flying",
+        "siege-mechanical"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Flying Machine",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "wall-breakers",
+      "id": 26000058,
+      "name": "Wall Breakers",
+      "elixir": 2,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Wall Breakers",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Wall Breakers Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "royal-hogs",
+      "id": 26000059,
+      "name": "Royal Hogs",
+      "elixir": 5,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Royal Hogs",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Royal Hogs Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-giant",
+      "id": 26000060,
+      "name": "Goblin Giant",
+      "elixir": 6,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Giant",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Goblin Giant Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "fisherman",
+      "id": 26000061,
+      "name": "Fisherman",
+      "elixir": 3,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Fisherman",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "magic-archer",
+      "id": 26000062,
+      "name": "Magic Archer",
+      "elixir": 4,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Magic Archer",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Magic Archer",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "electro-dragon",
+      "id": 26000063,
+      "name": "Electro Dragon",
+      "elixir": 5,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "dragon",
+        "electric",
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Electro Dragon",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Electro Dragon Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "firecracker",
+      "id": 26000064,
+      "name": "Firecracker",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "fire"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Firecracker",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Firecracker Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "mighty-miner",
+      "id": 26000065,
+      "name": "Mighty Miner",
+      "elixir": 4,
+      "rarity": "champion",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "champion",
+          "label": "Mighty Miner",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "elixir-golem",
+      "id": 26000067,
+      "name": "Elixir Golem",
+      "elixir": 3,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Elixir Golem",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "battle-healer",
+      "id": 26000068,
+      "name": "Battle Healer",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Battle Healer",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "skeleton-king",
+      "id": 26000069,
+      "name": "Skeleton King",
+      "elixir": 4,
+      "rarity": "champion",
+      "kind": "troop",
+      "families": [
+        "noble-royal",
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "champion",
+          "label": "Skeleton King",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "archer-queen",
+      "id": 26000072,
+      "name": "Archer Queen",
+      "elixir": 5,
+      "rarity": "champion",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "champion",
+          "label": "Archer Queen",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "golden-knight",
+      "id": 26000074,
+      "name": "Golden Knight",
+      "elixir": 4,
+      "rarity": "champion",
+      "kind": "troop",
+      "families": [
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "champion",
+          "label": "Golden Knight",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "monk",
+      "id": 26000077,
+      "name": "Monk",
+      "elixir": 5,
+      "rarity": "champion",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "champion",
+          "label": "Monk",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "skeleton-dragons",
+      "id": 26000080,
+      "name": "Skeleton Dragons",
+      "elixir": 4,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "dragon",
+        "flying",
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Skeleton Dragons",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "mother-witch",
+      "id": 26000083,
+      "name": "Mother Witch",
+      "elixir": 4,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Mother Witch",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "electro-spirit",
+      "id": 26000084,
+      "name": "Electro Spirit",
+      "elixir": 1,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "electric",
+        "spirit"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Electro Spirit",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "electro-giant",
+      "id": 26000085,
+      "name": "Electro Giant",
+      "elixir": 7,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [
+        "electric"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Electro Giant",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "phoenix",
+      "id": 26000087,
+      "name": "Phoenix",
+      "elixir": 4,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "fire",
+        "flying"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Phoenix",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "little-prince",
+      "id": 26000093,
+      "name": "Little Prince",
+      "elixir": 3,
+      "rarity": "champion",
+      "kind": "troop",
+      "families": [
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "champion",
+          "label": "Little Prince",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-demolisher",
+      "id": 26000095,
+      "name": "Goblin Demolisher",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Demolisher",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-machine",
+      "id": 26000096,
+      "name": "Goblin Machine",
+      "elixir": 5,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "goblin",
+        "siege-mechanical"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Machine",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "suspicious-bush",
+      "id": 26000097,
+      "name": "Suspicious Bush",
+      "elixir": 2,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Suspicious Bush",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblinstein",
+      "id": 26000099,
+      "name": "Goblinstein",
+      "elixir": 5,
+      "rarity": "champion",
+      "kind": "troop",
+      "families": [
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "champion",
+          "label": "Goblinstein",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "rune-giant",
+      "id": 26000101,
+      "name": "Rune Giant",
+      "elixir": 4,
+      "rarity": "epic",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Rune Giant",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "berserker",
+      "id": 26000102,
+      "name": "Berserker",
+      "elixir": 2,
+      "rarity": "common",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Berserker",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Berserker",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "boss-bandit",
+      "id": 26000103,
+      "name": "Boss Bandit",
+      "elixir": 6,
+      "rarity": "champion",
+      "kind": "troop",
+      "families": [
+        "noble-royal"
+      ],
+      "forms": [
+        {
+          "key": "champion",
+          "label": "Boss Bandit",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "ronin",
+      "id": 26000106,
+      "name": "Ronin",
+      "elixir": 5,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Ronin",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "cannon",
+      "id": 27000000,
+      "name": "Cannon",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "building",
+      "families": [
+        "building",
+        "siege-mechanical"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Cannon",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Cannon Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-hut",
+      "id": 27000001,
+      "name": "Goblin Hut",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "building",
+      "families": [
+        "anti-air",
+        "building",
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Hut",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "mortar",
+      "id": 27000002,
+      "name": "Mortar",
+      "elixir": 4,
+      "rarity": "common",
+      "kind": "building",
+      "families": [
+        "building",
+        "siege-mechanical"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Mortar",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Mortar Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "inferno-tower",
+      "id": 27000003,
+      "name": "Inferno Tower",
+      "elixir": 5,
+      "rarity": "rare",
+      "kind": "building",
+      "families": [
+        "anti-air",
+        "building",
+        "fire"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Inferno Tower",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "bomb-tower",
+      "id": 27000004,
+      "name": "Bomb Tower",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "building",
+      "families": [
+        "building",
+        "siege-mechanical",
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Bomb Tower",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "barbarian-hut",
+      "id": 27000005,
+      "name": "Barbarian Hut",
+      "elixir": 6,
+      "rarity": "rare",
+      "kind": "building",
+      "families": [
+        "barbarian",
+        "building"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Barbarian Hut",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "tesla",
+      "id": 27000006,
+      "name": "Tesla",
+      "elixir": 4,
+      "rarity": "common",
+      "kind": "building",
+      "families": [
+        "anti-air",
+        "building",
+        "electric",
+        "siege-mechanical"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Tesla",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Tesla Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "elixir-collector",
+      "id": 27000007,
+      "name": "Elixir Collector",
+      "elixir": 6,
+      "rarity": "rare",
+      "kind": "building",
+      "families": [
+        "building"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Elixir Collector",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "x-bow",
+      "id": 27000008,
+      "name": "X-Bow",
+      "elixir": 6,
+      "rarity": "epic",
+      "kind": "building",
+      "families": [
+        "building",
+        "siege-mechanical"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "X-Bow",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "tombstone",
+      "id": 27000009,
+      "name": "Tombstone",
+      "elixir": 3,
+      "rarity": "rare",
+      "kind": "building",
+      "families": [
+        "building",
+        "skeleton-bones"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Tombstone",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Tombstone",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "furnace",
+      "id": 27000010,
+      "name": "Furnace",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "building",
+      "families": [
+        "anti-air",
+        "building",
+        "fire",
+        "spirit"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Furnace",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Furnace Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-cage",
+      "id": 27000012,
+      "name": "Goblin Cage",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "building",
+      "families": [
+        "building",
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Cage",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Goblin Cage Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-drill",
+      "id": 27000013,
+      "name": "Goblin Drill",
+      "elixir": 4,
+      "rarity": "epic",
+      "kind": "building",
+      "families": [
+        "building",
+        "goblin"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Drill",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Goblin Drill Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "fireball",
+      "id": 28000000,
+      "name": "Fireball",
+      "elixir": 4,
+      "rarity": "rare",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "fire",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Fireball",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "arrows",
+      "id": 28000001,
+      "name": "Arrows",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Arrows",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "rage",
+      "id": 28000002,
+      "name": "Rage",
+      "elixir": 2,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Rage",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "rocket",
+      "id": 28000003,
+      "name": "Rocket",
+      "elixir": 6,
+      "rarity": "rare",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "fire",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Rocket",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-barrel",
+      "id": 28000004,
+      "name": "Goblin Barrel",
+      "elixir": 3,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "goblin",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Barrel",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Goblin Barrel Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "freeze",
+      "id": 28000005,
+      "name": "Freeze",
+      "elixir": 4,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "ice",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Freeze",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "mirror",
+      "id": 28000006,
+      "name": "Mirror",
+      "elixir": 1,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Mirror",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "lightning",
+      "id": 28000007,
+      "name": "Lightning",
+      "elixir": 6,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "electric",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Lightning",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "zap",
+      "id": 28000008,
+      "name": "Zap",
+      "elixir": 2,
+      "rarity": "common",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "electric",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Zap",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Zap Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "poison",
+      "id": 28000009,
+      "name": "Poison",
+      "elixir": 4,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Poison",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "graveyard",
+      "id": 28000010,
+      "name": "Graveyard",
+      "elixir": 5,
+      "rarity": "legendary",
+      "kind": "spell",
+      "families": [
+        "skeleton-bones",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Graveyard",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "the-log",
+      "id": 28000011,
+      "name": "The Log",
+      "elixir": 2,
+      "rarity": "legendary",
+      "kind": "spell",
+      "families": [
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "The Log",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "tornado",
+      "id": 28000012,
+      "name": "Tornado",
+      "elixir": 3,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Tornado",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "clone",
+      "id": 28000013,
+      "name": "Clone",
+      "elixir": 3,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Clone",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "earthquake",
+      "id": 28000014,
+      "name": "Earthquake",
+      "elixir": 3,
+      "rarity": "rare",
+      "kind": "spell",
+      "families": [
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Earthquake",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "barbarian-barrel",
+      "id": 28000015,
+      "name": "Barbarian Barrel",
+      "elixir": 2,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "barbarian",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Barbarian Barrel",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "hero",
+          "label": "Hero Barbarian Barrel",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "heal-spirit",
+      "id": 28000016,
+      "name": "Heal Spirit",
+      "elixir": 1,
+      "rarity": "rare",
+      "kind": "troop",
+      "families": [
+        "anti-air",
+        "spirit"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Heal Spirit",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "giant-snowball",
+      "id": 28000017,
+      "name": "Giant Snowball",
+      "elixir": 2,
+      "rarity": "common",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "ice",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Giant Snowball",
+          "asset": "/assets/placeholder-card.svg"
+        },
+        {
+          "key": "evolution",
+          "label": "Giant Snowball Evolution",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "royal-delivery",
+      "id": 28000018,
+      "name": "Royal Delivery",
+      "elixir": 3,
+      "rarity": "common",
+      "kind": "spell",
+      "families": [
+        "anti-air",
+        "noble-royal",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Royal Delivery",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "void",
+      "id": 28000023,
+      "name": "Void",
+      "elixir": 5,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Void",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "goblin-curse",
+      "id": 28000024,
+      "name": "Goblin Curse",
+      "elixir": 2,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "goblin",
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Goblin Curse",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "spirit-empress",
+      "id": 28000025,
+      "name": "Spirit Empress",
+      "elixir": 6,
+      "rarity": "legendary",
+      "kind": "troop",
+      "families": [
+        "spirit"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Spirit Empress",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    },
+    {
+      "key": "vines",
+      "id": 28000026,
+      "name": "Vines",
+      "elixir": 3,
+      "rarity": "epic",
+      "kind": "spell",
+      "families": [
+        "spell"
+      ],
+      "forms": [
+        {
+          "key": "base",
+          "label": "Vines",
+          "asset": "/assets/placeholder-card.svg"
+        }
+      ]
+    }
+  ]
+}
