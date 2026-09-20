@@ -2,6 +2,8 @@ import type {
   ManualTrackerResultInput,
   ManualTrackerResultResponse,
   SocialCredential,
+  TrackerDeckLog,
+  TrackerDeckLogResponse,
   TrackerSummary,
   TrackerSummaryResponse,
   TrackerFilters,
@@ -54,6 +56,12 @@ export const fetchTrackerSummary = async (credential: SocialCredential, filters:
     throw new Error("Game history returned an invalid response.");
   }
   return response.summary;
+};
+
+export const fetchTrackerDeckLog = async (credential: SocialCredential, playerTag = "", signal?: AbortSignal): Promise<TrackerDeckLog> => {
+  const response = await trackerRequest<TrackerDeckLogResponse>(`/decks${playerTag ? `?${new URLSearchParams({ playerTag })}` : ""}`, credential, { signal });
+  if (!response || typeof response !== "object" || !response.deckLog || !Array.isArray(response.deckLog.decks) || !Array.isArray(response.deckLog.players)) throw new Error("Played decks returned an invalid response.");
+  return response.deckLog;
 };
 
 export const requestTrackerSync = async (credential: SocialCredential, playerTag: string) => {

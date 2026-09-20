@@ -4,6 +4,7 @@ import type { ArenaCard, ArenaCollection, DeckCollection, DeckDefinition, DeckMo
 import { validateDeck } from "@draft-royale/shared";
 import { ArenaCardFace } from "../components/ArenaCardFace";
 import { DeckEditor } from "./DeckEditor";
+import { PlayedDecks } from "./PlayedDecks";
 import { clashDeckLink, clearSharedDeckLocation, cloneDeck, createDeckId, deckShareUrl, pairDecksFromSeed, pairShareUrl, readSavedDecks, sharedDeckFromLocation, sharedPairFromLocation, writeSavedDecks, deckElixirLabel } from "./deckUtils";
 import { libraryRequest, persistDeck } from "./deckApi";
 import "./deck-library.css";
@@ -199,7 +200,9 @@ export function DeckLibrary({ catalog, collection, onBack, onCopy, credential, o
       {availableDecks.length > limit && <button className="deck-new library-load-more" onClick={() => setLimit((current) => current + 24)}>Show 24 more decks</button>}
       {loading && <div className="deck-library-empty">Loading the deck library…</div>}
       {!loading && loadError && availableDecks.length === 0 && <div className="deck-library-empty"><strong>Deck library could not load.</strong><span>{loadError}</span></div>}
-      {!loading && !loadError && availableDecks.length === 0 && <div className="deck-library-empty"><Swords size={27} /><strong>{tab === "mirror" ? "No curated Mirror decks yet." : "No decks here yet."}</strong><span>{tab === "mirror" ? "Create a deck or start a same-deck battle with a classic or community deck." : "Make one, save it, and send it to a friend."}</span>{tab === "mirror" && onMirror && <button type="button" onClick={onMirror}><Swords size={15} /> Start same-deck battle</button>}<button type="button" onClick={() => setEditing(emptyDeck(createMode()))}><Plus size={15} /> Create deck</button></div>}
+      {!loading && !loadError && availableDecks.length === 0 && tab === "community" && <div className="deck-library-empty"><Users size={27} /><strong>No friends have published a deck yet.</strong><span>Decks your friends publish appear here. Their played decks are listed below.</span></div>}
+      {!loading && !loadError && availableDecks.length === 0 && tab !== "community" && <div className="deck-library-empty"><Swords size={27} /><strong>{tab === "mirror" ? "No curated Mirror decks yet." : "No decks here yet."}</strong><span>{tab === "mirror" ? "Create a deck or start a same-deck battle with a classic or community deck." : "Make one, save it, and send it to a friend."}</span>{tab === "mirror" && onMirror && <button type="button" onClick={onMirror}><Swords size={15} /> Start same-deck battle</button>}<button type="button" onClick={() => setEditing(emptyDeck(createMode()))}><Plus size={15} /> Create deck</button></div>}
     </div>
+    {credential && (tab === "saved" || tab === "community") && <PlayedDecks key={tab} credential={credential} catalog={catalog} scope={tab === "saved" ? "self" : "friends"} onEdit={setEditing} onSave={(deck) => storeDeck(deck, "private")} onCopy={onCopy} />}
   </section>;
 }
