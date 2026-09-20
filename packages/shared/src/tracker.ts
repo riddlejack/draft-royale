@@ -17,7 +17,13 @@ export interface TrackerCard {
   name: string;
   form: TrackerCardForm;
   elixirCost: number | null;
+  /** Rarity-relative API level and its cap. Absent on rows recorded before full battle detail was kept. */
+  level?: number | null;
+  maxLevel?: number | null;
 }
+
+/** How the game assigned a deck: "chosen" decks were built by the player; "assigned" covers mirror, draft, pick and event decks. */
+export type TrackerDeckOrigin = "chosen" | "assigned";
 
 export interface TrackerParticipant {
   /** Present only for manual results so social identity survives a later tag change. */
@@ -29,6 +35,13 @@ export interface TrackerParticipant {
   result: TrackerBattleResult;
   elixirLeaked: number | null;
   cards: TrackerCard[];
+  startingTrophies?: number | null;
+  trophyChange?: number | null;
+  kingTowerHitPoints?: number | null;
+  princessTowersHitPoints?: number[] | null;
+  clan?: { tag: string; name: string } | null;
+  globalRank?: number | null;
+  supportCards?: TrackerCard[];
 }
 
 export interface TrackerBattleProvenance {
@@ -47,6 +60,14 @@ export interface TrackerBattle {
   fetchedAt: number;
   provenance: TrackerBattleProvenance;
   participants: TrackerParticipant[];
+  /** Raw API deckSelection ("collection", "predefined", "draft", "pick", …). Null on rows recorded before it was kept. */
+  deckSelection?: string | null;
+  arena?: { id: number | null; name: string } | null;
+  leagueNumber?: number | null;
+  isLadderTournament?: boolean | null;
+  isHostedMatch?: boolean | null;
+  eventTag?: string | null;
+  tournamentTag?: string | null;
 }
 
 export interface TrackerTally {

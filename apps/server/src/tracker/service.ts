@@ -54,6 +54,14 @@ interface BattleRow {
   provenance_label: string;
   unit: TrackerBattle["unit"];
   created_by: string | null;
+  deck_selection: string | null;
+  arena_id: number | null;
+  arena_name: string | null;
+  league_number: number | null;
+  is_ladder_tournament: number | null;
+  is_hosted_match: number | null;
+  event_tag: string | null;
+  tournament_tag: string | null;
 }
 
 interface ParticipantRow {
@@ -67,6 +75,14 @@ interface ParticipantRow {
   result: TrackerBattleResult;
   elixir_leaked: number | null;
   cards_json: string;
+  starting_trophies: number | null;
+  trophy_change: number | null;
+  king_tower_hp: number | null;
+  princess_towers_hp_json: string | null;
+  clan_tag: string | null;
+  clan_name: string | null;
+  global_rank: number | null;
+  support_cards_json: string | null;
 }
 
 interface CommandRow { action: string; payload_hash: string; result_id: string }
@@ -88,7 +104,8 @@ interface PollRow {
   last_window_keys_json: string;
 }
 
-interface NormalizedBattle extends TrackerBattle { dedupeKey: string }
+/** `raw` is the API battle as received (icon URLs removed), kept so later features never depend on today's parser. */
+interface NormalizedBattle extends TrackerBattle { dedupeKey: string; raw?: string | null }
 
 export interface TrackerRegisteredPlayer {
   profileId: string;
@@ -164,7 +181,6 @@ const normalizePlayer = (player: TrackerRegisteredPlayer): TrackerRegisteredPlay
   tag: normalizeTrackerTag(player.tag),
 });
 const slugifyCardName = (name: string) => name.toLowerCase().replace(/[.']/g, "").replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-const clone = <T>(value: T): T => structuredClone(value);
 const safeJson = <T>(value: string, fallback: T): T => { try { return JSON.parse(value) as T; } catch { return fallback; } };
 
 const normalizeBattleTime = (value: unknown, fallbackMs: number) => {
@@ -192,8 +208,12 @@ const parseCardForm = (card: UnknownRecord): TrackerCardForm => {
 const parseCards = (value: unknown): TrackerCard[] => Array.isArray(value) ? value.slice(0, 12).flatMap((candidate) => {
   if (!isRecord(candidate)) return [];
   const name = text(candidate.name, "Unknown card");
-  return [{ id: integer(candidate.id), key: slugifyCardName(name) || `card-${integer(candidate.id) ?? "unknown"}`, name, form: parseCardForm(candidate), elixirCost: finite(candidate.elixirCost) } satisfies TrackerCard];
+  return [{ id: integer(candidate.id), key: slugifyCardName(name) || `card-${integer(candidate.id) ?? "unknown"}`, name, form: parseCardForm(candidate), elixirCost: finite(candidate.elixirCost), level: integer(candidate.level), maxLevel: integer(candidate.maxLevel) } satisfies TrackerCard];
 }) : [];
+// Tallies group a card across many battles, so a single battle's level would be misleading there.
+const bareCard = ({ id, key, name, form, elixirCost }: TrackerCard): TrackerCard => ({ id, key, name, form, elixirCost });
+const stripIconUrls = (value: unknown) => JSON.stringify(value, (key, entry: unknown) => key === "iconUrls" ? undefined : entry);
+const flag = (value: unknown): boolean | null => typeof value === "boolean" ? value : null;
 
 const canonicalTeamSignatures = (teams: TrackerParticipant[][]) => teams.map((team) => team.map((participant) => participant.tag).sort().join(","));
 const canonicalBattleKey = (battleTime: string, type: string, modeId: number | null, modeName: string, teams: TrackerParticipant[][]) => {
@@ -218,7 +238,13 @@ const parseApiParticipants = (value: unknown, side: 0 | 1): TrackerParticipant[]
     const name = text(candidate.name, "Unknown player");
     const tag = normalizeTrackerTag(candidate.tag);
     if (!validTag(tag)) return [];
-    return [{ profileId: null, tag, name, side, crowns: integer(candidate.crowns), result: "unknown" as const, elixirLeaked: finite(candidate.elixirLeaked), cards: parseCards(candidate.cards) }];
+    const clan = isRecord(candidate.clan) && text(candidate.clan.tag) ? { tag: normalizeTrackerTag(candidate.clan.tag), name: text(candidate.clan.name, "Unknown clan") } : null;
+    const towers = Array.isArray(candidate.princessTowersHitPoints) ? candidate.princessTowersHitPoints.flatMap((points) => integer(points) === null ? [] : [integer(points)!]).slice(0, 4) : null;
+    return [{
+      profileId: null, tag, name, side, crowns: integer(candidate.crowns), result: "unknown" as const, elixirLeaked: finite(candidate.elixirLeaked), cards: parseCards(candidate.cards),
+      startingTrophies: integer(candidate.startingTrophies), trophyChange: integer(candidate.trophyChange), kingTowerHitPoints: integer(candidate.kingTowerHitPoints),
+      princessTowersHitPoints: towers, clan, globalRank: integer(candidate.globalRank), supportCards: parseCards(candidate.supportCards),
+    }];
   }).sort((left, right) => left.tag.localeCompare(right.tag));
 
 export const normalizeApiBattle = (
@@ -247,7 +273,12 @@ export const normalizeApiBattle = (
   teams = teams.map((team, side) => team.map((participant) => ({ ...participant, side: side as 0 | 1, result: resultForSide(side as 0 | 1, teamCrowns) }))) as typeof teams;
   const dedupeKey = canonicalBattleKey(battleTime, type, mode.id, mode.name, teams);
   const unit = /duel/i.test(`${type} ${mode.name}`) ? "duel_round" : "match";
-  return { id: `api_${dedupeKey.slice(0, 24)}`, dedupeKey, battleTime, type, mode, source: "api", unit, fetchedAt, provenance, participants: teams.flat() };
+  const arena = isRecord(value.arena) ? { id: integer(value.arena.id), name: text(value.arena.name, "Unknown arena") } : null;
+  return {
+    id: `api_${dedupeKey.slice(0, 24)}`, dedupeKey, battleTime, type, mode, source: "api", unit, fetchedAt, provenance, participants: teams.flat(),
+    deckSelection: text(value.deckSelection) || null, arena, leagueNumber: integer(value.leagueNumber), isLadderTournament: flag(value.isLadderTournament),
+    isHostedMatch: flag(value.isHostedMatch), eventTag: text(value.eventTag) || null, tournamentTag: text(value.tournamentTag) || null, raw: stripIconUrls(value),
+  };
 };
 
 export const parseHistoricalImport = (value: unknown, importedAt: number, kind: "operator_snapshot" | "user_import", label = "Imported API observations"): ParsedHistoricalImport => {
@@ -379,6 +410,10 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
       player_tag TEXT NOT NULL, gap_start TEXT NOT NULL, gap_end TEXT NOT NULL, detected_at INTEGER NOT NULL,
       reason TEXT NOT NULL, PRIMARY KEY (player_tag, gap_start, gap_end)
     );
+    CREATE TABLE IF NOT EXISTS tracker_battle_raw (
+      battle_id TEXT PRIMARY KEY, observer_tag TEXT NOT NULL, stored_at INTEGER NOT NULL, raw_json TEXT NOT NULL,
+      FOREIGN KEY (battle_id) REFERENCES tracker_battles(id) ON DELETE CASCADE
+    );
   `);
   const ensureColumn = (table: string, name: string, sql: string) => {
     const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
@@ -387,6 +422,10 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
   ensureColumn("tracker_battles", "provenance_kind", "TEXT NOT NULL DEFAULT 'server_fetch'");
   ensureColumn("tracker_battles", "provenance_label", "TEXT NOT NULL DEFAULT 'Clash Royale API'");
   ensureColumn("tracker_battles", "unit", "TEXT NOT NULL DEFAULT 'match'");
+  // detail_version 0 rows predate full battle detail; a later sighting of the same battle upgrades them in place.
+  ensureColumn("tracker_battles", "detail_version", "INTEGER NOT NULL DEFAULT 0");
+  for (const [name, sql] of [["deck_selection", "TEXT"], ["arena_id", "INTEGER"], ["arena_name", "TEXT"], ["league_number", "INTEGER"], ["is_ladder_tournament", "INTEGER"], ["is_hosted_match", "INTEGER"], ["event_tag", "TEXT"], ["tournament_tag", "TEXT"]] as const) ensureColumn("tracker_battles", name, sql);
+  for (const [name, sql] of [["starting_trophies", "INTEGER"], ["trophy_change", "INTEGER"], ["king_tower_hp", "INTEGER"], ["princess_towers_hp_json", "TEXT"], ["clan_tag", "TEXT"], ["clan_name", "TEXT"], ["global_rank", "INTEGER"], ["support_cards_json", "TEXT"]] as const) ensureColumn("tracker_participants", name, sql);
   db.exec(`
     CREATE INDEX IF NOT EXISTS tracker_battles_time ON tracker_battles(battle_time DESC);
     CREATE INDEX IF NOT EXISTS tracker_participants_profile ON tracker_participants(profile_id, battle_id);
@@ -485,56 +524,85 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
       .run(battleId, tag, provenance.kind, provenance.label, provenance.observedAt, provenance.observedAt);
   };
 
+  const DETAIL_VERSION = 1;
+  const bit = (value: boolean | null | undefined) => value === null || value === undefined ? null : value ? 1 : 0;
+  const battleDetailValues = (battle: NormalizedBattle) => [battle.deckSelection ?? null, battle.arena?.id ?? null, battle.arena?.name ?? null, battle.leagueNumber ?? null, bit(battle.isLadderTournament), bit(battle.isHostedMatch), battle.eventTag ?? null, battle.tournamentTag ?? null];
+  const participantDetailValues = (participant: TrackerParticipant) => [participant.startingTrophies ?? null, participant.trophyChange ?? null, participant.kingTowerHitPoints ?? null, participant.princessTowersHitPoints ? JSON.stringify(participant.princessTowersHitPoints) : null, participant.clan?.tag ?? null, participant.clan?.name ?? null, participant.globalRank ?? null, participant.supportCards ? JSON.stringify(participant.supportCards) : null];
+  const storeBattleRaw = (battleId: string, battle: NormalizedBattle, observerTag: string) => {
+    if (battle.raw) db.prepare("INSERT OR IGNORE INTO tracker_battle_raw(battle_id,observer_tag,stored_at,raw_json) VALUES(?,?,?,?)").run(battleId, observerTag, now(), battle.raw);
+  };
+
   const insertBattle = (battle: NormalizedBattle, createdBy: string | null, observedTags: readonly string[] = []) => {
+    const detailVersion = battle.raw ? DETAIL_VERSION : 0;
     const inserted = db.prepare(`INSERT OR IGNORE INTO tracker_battles
-      (id,dedupe_key,battle_time,type,mode_id,mode_name,source,fetched_at,created_by,undone_at,provenance_kind,provenance_label,unit)
-      VALUES(?,?,?,?,?,?,?,?,?,NULL,?,?,?)`)
-      .run(battle.id, battle.dedupeKey, battle.battleTime, battle.type, battle.mode.id, battle.mode.name, battle.source, battle.fetchedAt, createdBy, battle.provenance.kind, battle.provenance.label, battle.unit);
+      (id,dedupe_key,battle_time,type,mode_id,mode_name,source,fetched_at,created_by,undone_at,provenance_kind,provenance_label,unit,detail_version,
+       deck_selection,arena_id,arena_name,league_number,is_ladder_tournament,is_hosted_match,event_tag,tournament_tag)
+      VALUES(?,?,?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(battle.id, battle.dedupeKey, battle.battleTime, battle.type, battle.mode.id, battle.mode.name, battle.source, battle.fetchedAt, createdBy, battle.provenance.kind, battle.provenance.label, battle.unit, detailVersion, ...battleDetailValues(battle));
     let id = battle.id;
+    const observerTag = observedTags[0] ?? battle.participants[0]?.tag ?? "#UNKNOWN";
     if (Number(inserted.changes) === 0) {
-      const existing = db.prepare("SELECT id,provenance_kind FROM tracker_battles WHERE dedupe_key = ?").get(battle.dedupeKey) as { id: string; provenance_kind: string } | undefined;
+      const existing = db.prepare("SELECT id,provenance_kind,detail_version FROM tracker_battles WHERE dedupe_key = ?").get(battle.dedupeKey) as { id: string; provenance_kind: string; detail_version: number } | undefined;
       id = existing?.id ?? battle.id;
       if (battle.provenance.kind === "server_fetch" && existing?.provenance_kind !== "server_fetch") db.prepare("UPDATE tracker_battles SET provenance_kind=?,provenance_label=?,fetched_at=? WHERE id=?").run(battle.provenance.kind, battle.provenance.label, battle.fetchedAt, id);
+      if (existing && battle.raw && existing.detail_version < DETAIL_VERSION) {
+        db.prepare(`UPDATE tracker_battles SET detail_version=?,deck_selection=?,arena_id=?,arena_name=?,league_number=?,is_ladder_tournament=?,is_hosted_match=?,event_tag=?,tournament_tag=? WHERE id=?`)
+          .run(DETAIL_VERSION, ...battleDetailValues(battle), id);
+        const update = db.prepare(`UPDATE tracker_participants SET cards_json=?,starting_trophies=?,trophy_change=?,king_tower_hp=?,princess_towers_hp_json=?,clan_tag=?,clan_name=?,global_rank=?,support_cards_json=?
+          WHERE battle_id=? AND player_tag=?`);
+        for (const participant of battle.participants) update.run(JSON.stringify(participant.cards), ...participantDetailValues(participant), id, participant.tag);
+        storeBattleRaw(id, battle, observerTag);
+      }
     } else {
       const statement = db.prepare(`INSERT INTO tracker_participants
-        (battle_id,side,position,profile_id,player_tag,player_name,crowns,result,elixir_leaked,cards_json) VALUES(?,?,?,?,?,?,?,?,?,?)`);
+        (battle_id,side,position,profile_id,player_tag,player_name,crowns,result,elixir_leaked,cards_json,
+         starting_trophies,trophy_change,king_tower_hp,princess_towers_hp_json,clan_tag,clan_name,global_rank,support_cards_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
       for (const side of [0, 1] as const) {
         const participants = battle.participants.filter((participant) => participant.side === side).sort((left, right) => left.tag.localeCompare(right.tag));
-        participants.forEach((participant, position) => statement.run(id, side, position, participant.profileId, participant.tag, participant.name, participant.crowns, participant.result, participant.elixirLeaked, JSON.stringify(participant.cards)));
+        participants.forEach((participant, position) => statement.run(id, side, position, participant.profileId, participant.tag, participant.name, participant.crowns, participant.result, participant.elixirLeaked, JSON.stringify(participant.cards), ...participantDetailValues(participant)));
       }
+      storeBattleRaw(id, battle, observerTag);
     }
     for (const observedTag of observedTags.length ? observedTags : battle.participants.map((participant) => participant.tag)) recordObservation(id, observedTag, battle.provenance);
     return { inserted: Number(inserted.changes) > 0, id };
   };
 
+  const BATTLE_COLUMNS = "id,battle_time,type,mode_id,mode_name,source,fetched_at,provenance_kind,provenance_label,unit,created_by,deck_selection,arena_id,arena_name,league_number,is_ladder_tournament,is_hosted_match,event_tag,tournament_tag";
+  const PARTICIPANT_COLUMNS = "battle_id,side,position,profile_id,player_tag,player_name,crowns,result,elixir_leaked,cards_json,starting_trophies,trophy_change,king_tower_hp,princess_towers_hp_json,clan_tag,clan_name,global_rank,support_cards_json";
+  const unbit = (value: number | null) => value === null ? null : value === 1;
+  const projectBattle = (row: BattleRow, participantRows: ParticipantRow[]): TrackerBattle => ({
+    id: row.id, battleTime: row.battle_time, type: row.type, mode: { id: row.mode_id, name: row.mode_name }, source: row.source,
+    unit: row.unit, fetchedAt: row.fetched_at, provenance: { kind: row.provenance_kind, label: row.provenance_label, observedAt: row.fetched_at },
+    deckSelection: row.deck_selection, arena: row.arena_name === null ? null : { id: row.arena_id, name: row.arena_name }, leagueNumber: row.league_number,
+    isLadderTournament: unbit(row.is_ladder_tournament), isHostedMatch: unbit(row.is_hosted_match), eventTag: row.event_tag, tournamentTag: row.tournament_tag,
+    participants: participantRows.map((participant) => ({
+      profileId: participant.profile_id, tag: participant.player_tag, name: participant.player_name, side: participant.side, crowns: participant.crowns, result: participant.result, elixirLeaked: participant.elixir_leaked, cards: safeJson(participant.cards_json, []),
+      startingTrophies: participant.starting_trophies, trophyChange: participant.trophy_change, kingTowerHitPoints: participant.king_tower_hp, princessTowersHitPoints: participant.princess_towers_hp_json ? safeJson<number[] | null>(participant.princess_towers_hp_json, null) : null,
+      clan: participant.clan_tag ? { tag: participant.clan_tag, name: participant.clan_name ?? "Unknown clan" } : null, globalRank: participant.global_rank, supportCards: participant.support_cards_json ? safeJson<TrackerCard[]>(participant.support_cards_json, []) : [],
+    })),
+  });
+
   const readBattle = (battleId: string): TrackerBattle => {
-    const row = db.prepare(`SELECT id,battle_time,type,mode_id,mode_name,source,fetched_at,provenance_kind,provenance_label,unit,created_by
-      FROM tracker_battles WHERE id = ?`).get(battleId) as unknown as BattleRow | undefined;
+    const row = db.prepare(`SELECT ${BATTLE_COLUMNS} FROM tracker_battles WHERE id = ?`).get(battleId) as unknown as BattleRow | undefined;
     if (!row) throw new TrackerError(404, "Tracked game was not found", "NOT_FOUND");
-    const participantRows = db.prepare(`SELECT battle_id,side,position,profile_id,player_tag,player_name,crowns,result,elixir_leaked,cards_json
-      FROM tracker_participants WHERE battle_id = ? ORDER BY side,position`).all(row.id) as unknown as ParticipantRow[];
-    return {
-      id: row.id, battleTime: row.battle_time, type: row.type, mode: { id: row.mode_id, name: row.mode_name }, source: row.source,
-      unit: row.unit, fetchedAt: row.fetched_at, provenance: { kind: row.provenance_kind, label: row.provenance_label, observedAt: row.fetched_at },
-      participants: participantRows.map((participant) => ({ profileId: participant.profile_id, tag: participant.player_tag, name: participant.player_name, side: participant.side, crowns: participant.crowns, result: participant.result, elixirLeaked: participant.elixir_leaked, cards: safeJson(participant.cards_json, []) })),
-    };
+    const participantRows = db.prepare(`SELECT ${PARTICIPANT_COLUMNS} FROM tracker_participants WHERE battle_id = ? ORDER BY side,position`).all(row.id) as unknown as ParticipantRow[];
+    return projectBattle(row, participantRows);
   };
 
   const visibleBattles = (actorProfileId: string, visibleProfileIds: ReadonlySet<string>) => {
     const tags = visibleTags(visibleProfileIds);
-    const rows = db.prepare(`SELECT id,battle_time,type,mode_id,mode_name,source,fetched_at,provenance_kind,provenance_label,unit,created_by
-      FROM tracker_battles WHERE undone_at IS NULL ORDER BY battle_time DESC`).all() as unknown as BattleRow[];
+    const rows = db.prepare(`SELECT ${BATTLE_COLUMNS} FROM tracker_battles WHERE undone_at IS NULL ORDER BY battle_time DESC`).all() as unknown as BattleRow[];
     if (rows.length === 0 || visibleProfileIds.size === 0) return [];
-    const participants = db.prepare(`SELECT battle_id,side,position,profile_id,player_tag,player_name,crowns,result,elixir_leaked,cards_json
-      FROM tracker_participants WHERE battle_id IN (SELECT id FROM tracker_battles WHERE undone_at IS NULL) ORDER BY battle_id,side,position`).all() as unknown as ParticipantRow[];
+    const participants = db.prepare(`SELECT ${PARTICIPANT_COLUMNS} FROM tracker_participants
+      WHERE battle_id IN (SELECT id FROM tracker_battles WHERE undone_at IS NULL) ORDER BY battle_id,side,position`).all() as unknown as ParticipantRow[];
     const byBattle = new Map<string, ParticipantRow[]>();
-    for (const participant of participants) byBattle.set(participant.battle_id, [...(byBattle.get(participant.battle_id) ?? []), participant]);
+    for (const participant of participants) { const list = byBattle.get(participant.battle_id); if (list) list.push(participant); else byBattle.set(participant.battle_id, [participant]); }
     return rows.flatMap((row) => {
       const participantRows = byBattle.get(row.id) ?? [];
       const allowed = row.source === "api"
         ? participantRows.some((participant) => tags.has(participant.player_tag))
         : Boolean(row.created_by && (row.created_by === actorProfileId || visibleProfileIds.has(row.created_by)));
-      return allowed ? [readBattle(row.id)] : [];
+      return allowed ? [projectBattle(row, participantRows)] : [];
     });
   };
 
@@ -656,28 +724,28 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
       addResult(modeTally, focus.result); modes.set(modeKey, modeTally);
       for (const card of focus.cards) {
         const key = `${card.id ?? card.key}\u0000${card.form}`;
-        const tally = cards.get(key) ?? { playerTag: filters.playerTag, card: clone(card), ...emptyTally() };
+        const tally = cards.get(key) ?? { playerTag: filters.playerTag, card: bareCard(card), ...emptyTally() };
         addResult(tally, focus.result); cards.set(key, tally);
       }
       const ownSignature = deckSignature(focus.cards);
       if (ownSignature) {
-        const tally = decks.get(ownSignature) ?? { playerTag: filters.playerTag, signature: ownSignature, cards: clone(focus.cards), ...emptyTally() };
+        const tally = decks.get(ownSignature) ?? { playerTag: filters.playerTag, signature: ownSignature, cards: focus.cards.map(bareCard), ...emptyTally() };
         addResult(tally, focus.result); decks.set(ownSignature, tally);
       }
       const opponents = battle.participants.filter((participant) => participant.side !== focus.side);
       for (const opponent of opponents) {
         for (const card of opponent.cards) {
           const key = `${card.id ?? card.key}\u0000${card.form}`;
-          const tally = opponentCards.get(key) ?? { playerTag: filters.playerTag, card: clone(card), ...emptyTally() };
+          const tally = opponentCards.get(key) ?? { playerTag: filters.playerTag, card: bareCard(card), ...emptyTally() };
           addResult(tally, focus.result); opponentCards.set(key, tally);
         }
         const opposingSignature = deckSignature(opponent.cards);
         if (opposingSignature) {
-          const tally = opponentDecks.get(opposingSignature) ?? { playerTag: filters.playerTag, signature: opposingSignature, cards: clone(opponent.cards), ...emptyTally() };
+          const tally = opponentDecks.get(opposingSignature) ?? { playerTag: filters.playerTag, signature: opposingSignature, cards: opponent.cards.map(bareCard), ...emptyTally() };
           addResult(tally, focus.result); opponentDecks.set(opposingSignature, tally);
           if (ownSignature) {
             const key = `${ownSignature}\u0000${opposingSignature}`;
-            const matchup = deckMatchups.get(key) ?? { playerTag: filters.playerTag, ownSignature, ownCards: clone(focus.cards), opponentSignature: opposingSignature, opponentCards: clone(opponent.cards), ...emptyTally() };
+            const matchup = deckMatchups.get(key) ?? { playerTag: filters.playerTag, ownSignature, ownCards: focus.cards.map(bareCard), opponentSignature: opposingSignature, opponentCards: opponent.cards.map(bareCard), ...emptyTally() };
             addResult(matchup, focus.result); deckMatchups.set(key, matchup);
           }
         }

@@ -154,6 +154,66 @@ describe("normalization, deduplication, and provenance", () => {
   });
 });
 
+describe("full battle detail", () => {
+  const detailed = (battleTime = "20260908T203000.000Z") => ({
+    ...battle(
+      [{ ...participant(initialPlayers[0]!, 0, [{ id: 26_000_059, name: "Royal Hogs", level: 14, maxLevel: 14, evolutionLevel: 1, elixirCost: 5, iconUrls: { medium: "https://example.test/hogs.png" } }]), startingTrophies: 13_574, trophyChange: -30, kingTowerHitPoints: 0, princessTowersHitPoints: null, clan: { tag: "#2PP0Q", name: "Test Clan" }, supportCards: [{ id: 159_000_000, name: "Tower Princess", level: 15, maxLevel: 16 }] }],
+      [{ ...participant(initialPlayers[1]!, 3), startingTrophies: 13_573, trophyChange: 30, kingTowerHitPoints: 7_728, princessTowersHitPoints: [3_182, 3_991] }],
+      battleTime, "MirrorDeck_Friendly",
+    ),
+    deckSelection: "predefined", arena: { id: 54_000_144, name: "Spirit Square" }, leagueNumber: 1, isLadderTournament: false, isHostedMatch: false,
+  });
+
+  it("keeps deck selection, trophies, levels, tower troops, and the raw battle without icon URLs", async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "draft-tracker-detail-")); temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "arena.sqlite");
+    const service = createTrackerService({ databasePath, getPlayers: () => initialPlayers.slice(0, 2), autoStart: false }); services.push(service);
+    service.importHistorical(parseHistoricalImport([detailed()], Date.parse("2026-09-08T20:40:00Z"), "user_import"), "user_import");
+    const game = summary(service, "a", ["a"], { playerTag: initialPlayers[0]!.tag }).recentGames[0]!;
+    expect(game).toMatchObject({ deckSelection: "predefined", arena: { id: 54_000_144, name: "Spirit Square" }, leagueNumber: 1, isLadderTournament: false, isHostedMatch: false });
+    const own = game.participants.find((item) => item.tag === initialPlayers[0]!.tag)!;
+    expect(own).toMatchObject({ startingTrophies: 13_574, trophyChange: -30, kingTowerHitPoints: 0, princessTowersHitPoints: null, clan: { tag: "#2PP0Q", name: "Test Clan" } });
+    expect(own.cards[0]).toMatchObject({ name: "Royal Hogs", level: 14, maxLevel: 14, form: "evolution" });
+    expect(own.supportCards?.[0]).toMatchObject({ name: "Tower Princess", level: 15, maxLevel: 16 });
+    expect(game.participants.find((item) => item.tag === initialPlayers[1]!.tag)?.princessTowersHitPoints).toEqual([3_182, 3_991]);
+    expect(summary(service, "a", ["a"], { playerTag: initialPlayers[0]!.tag }).decks[0]!.cards[0]).not.toHaveProperty("level");
+    const inspection = new DatabaseSync(databasePath, { readOnly: true });
+    const raw = inspection.prepare("SELECT raw_json,observer_tag FROM tracker_battle_raw").all() as Array<{ raw_json: string; observer_tag: string }>;
+    inspection.close();
+    expect(raw).toHaveLength(1);
+    expect(raw[0]!.raw_json).not.toContain("iconUrls");
+    expect(JSON.parse(raw[0]!.raw_json)).toMatchObject({ deckSelection: "predefined", team: [{ trophyChange: -30 }] });
+  });
+
+  it("upgrades a battle recorded before full detail was kept when the API reports it again", async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "draft-tracker-upgrade-")); temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, "arena.sqlite");
+    const row = detailed();
+    const players = initialPlayers.slice(0, 2);
+    const seed = createTrackerService({ databasePath, getPlayers: () => players, autoStart: false });
+    seed.importHistorical(parseHistoricalImport([row], Date.parse("2026-09-08T20:40:00Z"), "operator_snapshot"), "operator_snapshot");
+    seed.close();
+    const legacy = new DatabaseSync(databasePath);
+    legacy.exec(`DELETE FROM tracker_battle_raw; UPDATE tracker_battles SET detail_version=0,deck_selection=NULL,arena_id=NULL,arena_name=NULL;
+      UPDATE tracker_participants SET trophy_change=NULL,starting_trophies=NULL,support_cards_json=NULL,cards_json='[{"id":26000059,"key":"royal-hogs","name":"Royal Hogs","form":"evolution","elixirCost":5}]' WHERE side=0;`);
+    legacy.close();
+    const service = createTrackerService({
+      databasePath, getPlayers: () => players, apiToken: "test-token", autoStart: false, now: () => Date.parse("2026-09-08T20:41:00Z"),
+      fetchImpl: (async (input) => new Response(JSON.stringify(String(input).includes(encodeURIComponent(players[0]!.tag)) ? [row] : []), { status: 200 })) as typeof fetch,
+    }); services.push(service);
+    expect(summary(service, "a", ["a"], { playerTag: players[0]!.tag }).recentGames[0]!.deckSelection).toBeNull();
+    await service.syncNow();
+    await service.syncNow();
+    const result = summary(service, "a", ["a"], { playerTag: players[0]!.tag });
+    expect(result.recentGames).toHaveLength(1);
+    expect(result.recentGames[0]).toMatchObject({ deckSelection: "predefined", provenance: { kind: "server_fetch" } });
+    expect(result.recentGames[0]!.participants.find((item) => item.tag === players[0]!.tag)).toMatchObject({ trophyChange: -30, cards: [{ level: 14 }] });
+    const inspection = new DatabaseSync(databasePath, { readOnly: true });
+    expect(inspection.prepare("SELECT count(*) AS count FROM tracker_battle_raw").get()).toMatchObject({ count: 1 });
+    inspection.close();
+  });
+});
+
 describe("adaptive per-tag scheduling and coverage", () => {
   it("lets a healthy tag complete when another tag fails and honors Retry-After per tag", async () => {
     let timestamp = Date.parse("2026-09-08T20:40:00Z");
