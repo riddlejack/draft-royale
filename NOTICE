@@ -1,0 +1,20 @@
+Draft Royale
+============
+
+The MIT License in LICENSE applies only to the original source code and
+original documentation in this sanitized source distribution.
+
+Clash Royale and Supercell are trademarks of Supercell Oy. This material is
+unofficial and is not endorsed by Supercell. Use of Supercell fan content is
+subject to the Supercell Fan Content Policy:
+https://supercell.com/en/fan-content-policy/
+
+This source distribution does not include Clash Royale card artwork, game UI
+artwork, game fonts, Supercell marks, private runtime data, or deployment
+state. Catalog image references use an original neutral placeholder. The MIT
+License does not grant rights to third-party names, marks, or game content.
+
+The application can draft cards and create deck links. It cannot grant game
+ownership, unlock cards, configure a battle mode inside Clash Royale, or prove
+that a battle was played unless a separate observed API record supports that
+claim.

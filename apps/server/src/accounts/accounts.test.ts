@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { createHash, createHmac, randomBytes, scryptSync } from "node:crypto";
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -46,22 +47,76 @@ describe("remembered player accounts", () => {
     cleanup.push(() => app.locals.arenaService.close());
     await request(app).get("/api/accounts").expect(404);
   });
-  it("preserves legacy rows but blocks sign-in until the explicit password migration runs", () => {
+  it("revokes a legacy bearer across every protected surface and preserves data after credential migration", async () => {
     const dir = mkdtempSync(path.join(tmpdir(), "draft-legacy-accounts-"));
     cleanup.push(() => rmSync(dir, { recursive: true, force: true }));
     const databasePath = path.join(dir, "test.sqlite");
     const options = { catalog, catalogVersion: "test", databasePath };
-    const app = createArenaApp(options);
-    const accounts = app.locals.accountService as AccountService;
-    accounts.register({ displayName: "LegacyPlayer", tag: "#P0LYQ", password: "temporary secure pass" });
+    let app = createArenaApp(options);
+    let accounts = app.locals.accountService as AccountService;
+    const legacy = accounts.register({ displayName: "LegacyPlayer", tag: "#P0LYQ", password: "temporary secure pass" });
+    const friend = accounts.register({ displayName: "TrustedFriend", tag: "#28PYL", password: "another secure phrase" });
+    const legacyBearer = { Authorization: `Bearer ${legacy.credential.token}` };
+    const friendBearer = { Authorization: `Bearer ${friend.credential.token}` };
+    const link = await request(app).post("/api/social/friend-links").set(legacyBearer).send({ commandId: "legacy-link" }).expect(201);
+    await request(app).post("/api/social/friend-links/accept").set(friendBearer)
+      .send({ token: link.body.friendLink.token, commandId: "friend-accept" }).expect(200);
+    await request(app).post("/api/decks").set(legacyBearer).send({
+      commandId: "saved-before-upgrade",
+      deck: { id: "legacy-deck", name: "Preserved deck", mode: "classic", cards: ["hog-rider", "musketeer", "ice-golem", "skeletons", "ice-spirit", "cannon", "fireball", "the-log"] },
+    }).expect(201);
+    await request(app).post("/api/tracker/manual").set(legacyBearer).send({
+      commandId: "history-before-upgrade", battleTime: "2026-09-20T12:00:00Z", type: "friendly",
+      mode: { name: "Friendly" }, teamAProfileIds: [legacy.account.profileId], teamBProfileIds: [friend.account.profileId],
+      winner: "a", crownsA: 1, crownsB: 0,
+    }).expect(201);
     app.locals.arenaService.close();
-    const database = new DatabaseSync(databasePath);
-    database.prepare("UPDATE club_accounts SET password_version=0 WHERE username='legacyplayer'").run();
+
+    let database = new DatabaseSync(databasePath);
+    const identitySecret = String(database.prepare("SELECT value FROM club_account_meta WHERE key='identity_secret'").get()?.value);
+    const oldToken = createHmac("sha256", identitySecret).update("club-profile:legacyplayer").digest("base64url");
+    database.prepare("UPDATE club_accounts SET password_version=0,credential_version=0 WHERE username='legacyplayer'").run();
+    database.prepare("UPDATE social_profiles SET token_hash=? WHERE id=?").run(createHash("sha256").update(oldToken).digest("hex"), legacy.account.profileId);
     database.close();
-    const restored = createArenaApp(options);
-    cleanup.push(() => restored.locals.arenaService.close());
-    const restoredAccounts = restored.locals.accountService as AccountService;
-    expect(restoredAccounts.list().map((account) => account.displayName)).toEqual(["LegacyPlayer"]);
-    expect(() => restoredAccounts.login({ username: "LegacyPlayer", password: "temporary secure pass" })).toThrow(/one-time password migration/i);
+
+    app = createArenaApp(options);
+    accounts = app.locals.accountService as AccountService;
+    expect(accounts.list().map((account) => account.displayName)).toEqual(["LegacyPlayer", "TrustedFriend"]);
+    expect(() => accounts.login({ username: "LegacyPlayer", password: "temporary secure pass" })).toThrow(/one-time password migration/i);
+    const oldBearer = { Authorization: `Bearer ${oldToken}` };
+    await request(app).get("/api/accounts/session").set(oldBearer).expect(401);
+    await request(app).get("/api/social/state").set(oldBearer).expect(401);
+    await request(app).get("/api/decks/mine").set(oldBearer).expect(401);
+    await request(app).get("/api/tracker/summary").set(oldBearer).expect(401);
+    app.locals.arenaService.close();
+
+    database = new DatabaseSync(databasePath);
+    const salt = randomBytes(16).toString("hex");
+    const migratedPassword = "new migrated password";
+    const credentialVersion = 1;
+    const migratedToken = createHmac("sha256", identitySecret).update(`club-profile:legacyplayer:v${credentialVersion}`).digest("base64url");
+    database.exec("BEGIN IMMEDIATE;");
+    database.prepare("UPDATE club_accounts SET salt=?,password_hash=?,password_version=1,credential_version=? WHERE username='legacyplayer'")
+      .run(salt, scryptSync(migratedPassword, salt, 32).toString("hex"), credentialVersion);
+    database.prepare("UPDATE social_profiles SET token_hash=? WHERE id=?")
+      .run(createHash("sha256").update(migratedToken).digest("hex"), legacy.account.profileId);
+    database.exec("COMMIT;");
+    database.close();
+
+    app = createArenaApp(options);
+    accounts = app.locals.accountService as AccountService;
+    expect(() => accounts.login({ username: "LegacyPlayer", password: "temporary secure pass" })).toThrow("incorrect");
+    const migrated = accounts.login({ username: "LegacyPlayer", password: migratedPassword });
+    expect(migrated.credential).toEqual({ profileId: legacy.account.profileId, token: migratedToken });
+    await request(app).get("/api/accounts/session").set(oldBearer).expect(401);
+    expect((await request(app).get("/api/social/state").set({ Authorization: `Bearer ${migratedToken}` }).expect(200)).body.state.friends).toHaveLength(1);
+    expect((await request(app).get("/api/decks/mine").set({ Authorization: `Bearer ${migratedToken}` }).expect(200)).body.decks).toEqual([expect.objectContaining({ name: "Preserved deck" })]);
+    expect((await request(app).get("/api/tracker/summary").set({ Authorization: `Bearer ${migratedToken}` }).expect(200)).body.summary.recentGames).toHaveLength(1);
+    app.locals.arenaService.close();
+
+    app = createArenaApp(options);
+    cleanup.push(() => app.locals.arenaService.close());
+    expect((app.locals.accountService as AccountService).login({ username: "LegacyPlayer", password: migratedPassword }).credential.token).toBe(migratedToken);
+    await request(app).get("/api/social/state").set(oldBearer).expect(401);
   });
 });
