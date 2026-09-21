@@ -34,6 +34,10 @@ ARENA_DATABASE_PATH=/absolute/path/to/arena.sqlite pnpm migrate:legacy-account -
 
 The migration changes that account's password salt, hash, and version and rotates its linked social login credential, permanently revoking any bearer issued under the legacy password. It preserves profile IDs, friends, decks, rooms, and history.
 
+## Accounts, names, and friends
+
+Google sign-in appears only when `GOOGLE_OAUTH_CLIENT_ID` (a public Web client ID; no client secret is used) is set in `data/private/tracker.env`. Accounts are shown under the in-game name of the Clash Royale tag they track, and friends belong to the account rather than to the tag, so tracking someone else's public tag never exposes their friends list. `DRAFT_ROYALE_CLUB_TAGS` optionally lists the tags of one friend group, comma-separated and written without `#` (an env file reads a leading `#` as a comment); the first sign-in-capable account on each tag is befriended with the others.
+
 ## Validate
 
 ```sh

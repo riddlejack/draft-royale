@@ -187,7 +187,7 @@ describe("remembered player accounts", () => {
     const options = { catalog, catalogVersion: "test", databasePath };
     let app = createArenaApp(options);
     let accounts = app.locals.accountService as AccountService;
-    const reset = accounts.register({ displayName: "PlayerOne", tag: "#P0LYQ", password: "temporary secure pass" });
+    const reset = accounts.register({ displayName: "ResetFriend", tag: "#P0LYQ", password: "temporary secure pass" });
     const friend = accounts.register({ displayName: "TrustedFriend", tag: "#28PYL", password: "another secure phrase" });
     const resetBearer = { Authorization: `Bearer ${reset.credential.token}` };
     const friendBearer = { Authorization: `Bearer ${friend.credential.token}` };
@@ -224,10 +224,10 @@ describe("remembered player accounts", () => {
     app = createArenaApp(options);
     cleanup.push(() => app.locals.arenaService.close());
     accounts = app.locals.accountService as AccountService;
-    expect(() => accounts.login({ username: "PlayerOne", password: "temporary secure pass" })).toThrow(/use Create account/i);
-    expect(() => accounts.register({ displayName: "PlayerOne", password: "replacement durable password" })).toThrow(/one-time reset code/i);
-    expect(() => accounts.register({ displayName: "PlayerOne", password: "replacement durable password", resetCode: "wrong code" })).toThrow(/one-time reset code/i);
-    const claimed = accounts.register({ displayName: "PlayerOne", tag: "#28PYL", password: "replacement durable password", resetCode });
+    expect(() => accounts.login({ username: "ResetFriend", password: "temporary secure pass" })).toThrow(/use Create account/i);
+    expect(() => accounts.register({ displayName: "ResetFriend", password: "replacement durable password" })).toThrow(/one-time reset code/i);
+    expect(() => accounts.register({ displayName: "ResetFriend", password: "replacement durable password", resetCode: "wrong code" })).toThrow(/one-time reset code/i);
+    const claimed = accounts.register({ displayName: "ResetFriend", tag: "#28PYL", password: "replacement durable password", resetCode });
     expect(claimed.account).toMatchObject({ profileId: reset.account.profileId, tag: "#P0LYQ" });
     expect(claimed.collection).toEqual(collection);
     expect(claimed.recoveryCode).toMatch(/^DR-/);
@@ -239,7 +239,7 @@ describe("remembered player accounts", () => {
     await request(app).get("/api/social/state").set(resetBearer).expect(401);
     await request(app).get("/api/decks/mine").set(resetBearer).expect(401);
     await request(app).get("/api/tracker/summary").set(resetBearer).expect(401);
-    expect(() => accounts.register({ displayName: "PlayerOne", password: "another durable password", resetCode })).toThrow(/already has an account/i);
+    expect(() => accounts.register({ displayName: "ResetFriend", password: "another durable password", resetCode })).toThrow(/already has an account/i);
   });
 
   it("persists account-owned collections and uses one-time recovery to revoke every older session", async () => {

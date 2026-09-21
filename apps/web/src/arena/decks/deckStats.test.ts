@@ -32,6 +32,6 @@ describe("deck builder stats", () => {
   });
 
   it("normalises player tags like the server", () => {
-    expect([normalizePlayerTag(" 2pyl0q8 "), normalizePlayerTag("#8QRJCV2"), normalizePlayerTag(null), normalizePlayerTag("")]).toEqual(["#2PYL0Q8", "#8QRJCV2", "", ""]);
+    expect([normalizePlayerTag(" 2pyl0q "), normalizePlayerTag("#8QRJCV"), normalizePlayerTag(null), normalizePlayerTag("")]).toEqual(["#2PYL0Q", "#8QRJCV", "", ""]);
   });
 });
