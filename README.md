@@ -2,14 +2,14 @@
 
 **Draft Clash Royale decks against your friends, with Evos, Heroes, and Champions.**
 
-My friend and I love Clash Royale's draft modes, but friendly battles barely offer them. The in-game draft pulls from a fixed slice of the card pool, leaves out Champions and Evolutions, and gives you no say over the rules. Draft Royale moves the draft to the browser: two players draft live from the full card pool, special forms included, then each opens the finished deck in Clash Royale with one tap and plays an ordinary friendly battle.
+Provides much-needed improvements to friendly battles. In-game drafts pull from a fixed card pool, exclude Champions and Evolutions, and leave you with no say over the rules. Draft Royale moves the draft to the browser: two players draft live from the full card pool, Evos/Heroes included, then each opens the finished deck in Clash Royale with one tap and plays an ordinary friendly battle.
 
 **[Play it at draft-royale.com →](https://draft-royale.com)**
 
 ## What you can do
 
-- **Mega Draft.** One shared board of 16 to 96 cards. Picks alternate, and every card you take is one your opponent can't have. The first pick alternates across rematches.
-- **Classic and Triple Draft.** Classic: choose one of two and your opponent gets the other. Triple: choose one of three.
+- **Mega Draft.**
+- **Classic and Triple Draft.**
 - **Evos, Heroes, and Champions.** Pick a card's form as you draft it, and the deck fills the game's special slots correctly. Group the special forms into their own rounds, or switch them off for a plain draft.
 - **Your rules.** Filter the pool by elixir cost, rarity, card type, or family, or include and exclude cards by hand. Set a timer per pick or for the whole draft. Add the Mirror card, or draft for a Chaos mode with its own pool.
 - **Your cards.** Enter a player tag to import that profile's collection, and drafts only offer cards and forms both players actually own.
