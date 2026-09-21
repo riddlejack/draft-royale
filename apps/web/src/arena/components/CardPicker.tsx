@@ -14,7 +14,14 @@ export interface CardPickerProps {
   disabledKeys?: readonly string[];
   compact?: boolean;
   showSelectedFirst?: boolean;
+  /** Optional per-card record of the signed-in player, keyed by card key. Adds a badge and two sort options; the picker is unchanged without it. */
+  cardStats?: ReadonlyMap<string, CardPickerStat>;
 }
+
+export interface CardPickerStat { games: number; winRate: number | null; badge: string; description: string; small: boolean }
+export type PickerSort = "elixir" | "played" | "winRate";
+export const PICKER_BADGE_MIN_GAMES = 3;
+export const PICKER_RANKED_MIN_GAMES = 5;
 
 export type PickerKind = "all" | "troop" | "building" | "spell";
 export type PickerRole = "anti-air" | "flying" | "ground" | "ranged" | "special";
@@ -51,6 +58,17 @@ export function filterPickerCards(cards: readonly ArenaCard[], options: { search
     && [...options.roles].every((role) => matchesRole(card, role)));
 }
 
+const byElixirThenName = (a: ArenaCard, b: ArenaCard) => (isFixedArenaElixirCost(a.elixir) ? a.elixir : Number.POSITIVE_INFINITY) - (isFixedArenaElixirCost(b.elixir) ? b.elixir : Number.POSITIVE_INFINITY) || a.name.localeCompare(b.name);
+
+/** "played" puts the most-used cards first; "winRate" ranks only cards with enough games and leaves the rest in cost order after them. */
+export function sortPickerCards(cards: readonly ArenaCard[], sort: PickerSort, stats?: ReadonlyMap<string, CardPickerStat>) {
+  const games = (card: ArenaCard) => stats?.get(card.key)?.games ?? 0;
+  const ranked = (card: ArenaCard) => games(card) >= PICKER_RANKED_MIN_GAMES && stats?.get(card.key)?.winRate !== null;
+  return [...cards].sort((a, b) => sort === "played" ? games(b) - games(a) || byElixirThenName(a, b)
+    : sort === "winRate" ? Number(ranked(b)) - Number(ranked(a)) || (ranked(a) && ranked(b) ? (stats!.get(b.key)!.winRate! - stats!.get(a.key)!.winRate!) || games(b) - games(a) : 0) || byElixirThenName(a, b)
+      : byElixirThenName(a, b));
+}
+
 export function toggledPickerRoles(current: ReadonlySet<PickerRole>, role: PickerRole) {
   const next = new Set(current);
   if (next.has(role)) next.delete(role);
@@ -72,6 +90,7 @@ export function CardPicker({
   disabledKeys = [],
   compact = false,
   showSelectedFirst = false,
+  cardStats,
 }: CardPickerProps) {
   const headingId = useId();
   const [search, setSearch] = useState("");
@@ -79,12 +98,15 @@ export function CardPicker({
   const [roles, setRoles] = useState<Set<PickerRole>>(() => new Set());
   const [rarity, setRarity] = useState("all");
   const [elixir, setElixir] = useState<number | null>(null);
+  const [sort, setSort] = useState<PickerSort>("elixir");
+  const hasStats = Boolean(cardStats?.size);
+  const activeSort = hasStats ? sort : "elixir";
   const selected = useMemo(() => new Set(selectedKeys), [selectedKeys]);
   const disabled = useMemo(() => new Set(disabledKeys), [disabledKeys]);
-  const visible = useMemo(() => filterPickerCards(cards, { search, kind, roles, rarity, elixir })
-    .sort((a, b) => showSelectedFirst && selected.has(a.key) !== selected.has(b.key)
-      ? selected.has(a.key) ? -1 : 1
-      : (isFixedArenaElixirCost(a.elixir) ? a.elixir : Number.POSITIVE_INFINITY) - (isFixedArenaElixirCost(b.elixir) ? b.elixir : Number.POSITIVE_INFINITY) || a.name.localeCompare(b.name)), [cards, elixir, kind, rarity, roles, search, selected, showSelectedFirst]);
+  const visible = useMemo(() => {
+    const sorted = sortPickerCards(filterPickerCards(cards, { search, kind, roles, rarity, elixir }), activeSort, cardStats);
+    return showSelectedFirst ? sorted.sort((a, b) => Number(selected.has(b.key)) - Number(selected.has(a.key))) : sorted;
+  }, [activeSort, cardStats, cards, elixir, kind, rarity, roles, search, selected, showSelectedFirst]);
 
   const toggle = (key: string) => {
     if (disabled.has(key)) return;
@@ -108,6 +130,7 @@ export function CardPicker({
       </div>
       <label className="card-picker-rarity">Rarity<select value={rarity} onChange={(event) => setRarity(event.target.value)}><option value="all">All</option>{rarityLabels.map((value) => <option value={value} key={value}>{value[0]?.toUpperCase()}{value.slice(1)}</option>)}</select></label>
     </div>
+    {hasStats && <label className="card-picker-rarity card-picker-sort">Sort<select value={sort} onChange={(event) => setSort(event.target.value as PickerSort)}><option value="elixir">Elixir cost</option><option value="played">My most played</option><option value="winRate">My best win rate (min {PICKER_RANKED_MIN_GAMES} games)</option></select></label>}
     <div className="card-picker-filters card-picker-role-filters" aria-label="Card roles">
       {roleLabels.map((item) => <button type="button" key={item.key} title={item.title} className={roles.has(item.key) ? "is-active" : ""} aria-pressed={roles.has(item.key)} onClick={() => setRoles((current) => toggledPickerRoles(current, item.key))}>{item.label}</button>)}
     </div>
@@ -120,9 +143,12 @@ export function CardPicker({
         const isSelected = selected.has(card.key);
         const unavailable = disabled.has(card.key);
         const isDisabled = unavailable || (!isSelected && maxSelected !== undefined && selectedKeys.length >= maxSelected);
-        return <button type="button" key={card.key} className={`card-picker-option ${isSelected ? "is-selected" : ""} ${unavailable ? "is-unavailable" : ""}`} disabled={isDisabled} aria-pressed={isSelected} aria-label={unavailable ? `${card.name} unavailable` : `${isSelected ? "Remove" : "Add"} ${card.name}`} onClick={() => toggle(card.key)}>
+        const stat = cardStats?.get(card.key);
+        const badge = stat && stat.games >= PICKER_BADGE_MIN_GAMES ? stat : null;
+        return <button type="button" key={card.key} className={`card-picker-option ${isSelected ? "is-selected" : ""} ${unavailable ? "is-unavailable" : ""}`} disabled={isDisabled} aria-pressed={isSelected} aria-label={`${unavailable ? `${card.name} unavailable` : `${isSelected ? "Remove" : "Add"} ${card.name}`}${badge ? `. ${badge.description}` : ""}`} title={stat?.description} onClick={() => toggle(card.key)}>
           <ArenaCardFace card={card} form="base" legalForms={card.forms.map((form) => form.key)} />
           <span className="card-picker-name">{card.name}</span>
+          {badge && <span className={`card-picker-stat${badge.small ? " is-small" : ""}`} aria-hidden="true">{badge.badge}</span>}
           {isSelected && <span className="card-picker-check"><Check size={13} strokeWidth={3} /></span>}
           {unavailable && <span className="card-picker-unavailable">Unavailable</span>}
         </button>;

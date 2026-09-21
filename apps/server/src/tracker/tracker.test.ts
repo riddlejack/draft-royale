@@ -418,6 +418,19 @@ describe("insights, card stats and deck record", () => {
   });
 });
 
+describe("builder statistics ownership", () => {
+  it("returns nothing for a viewer without a tag instead of a friend's record", async () => {
+    const [alpha, bravo] = [initialPlayers[0]!, initialPlayers[1]!];
+    const cards = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: `Card ${index + 1}`, elixirCost: 3 }));
+    const service = serviceWithLogs({ logs: { [alpha.tag]: [{ ...battle([participant(alpha, 2, cards)], [participant(bravo, 1, cards)]), deckSelection: "collection" }] } });
+    await service.syncNow([alpha.tag]);
+    const untagged = { actorProfileId: "guest", visibleProfileIds: new Set(["guest", "a"]) };
+    expect(service.getCardStats(untagged)).toMatchObject({ playerTag: "", cards: {} });
+    expect(service.getDeckRecord({ ...untagged, cards: "1,2,3,4,5,6,7,8" })).toMatchObject({ playerTag: "", chosen: { games: 0 } });
+    expect(service.getCardStats({ ...untagged, playerTag: alpha.tag }).playerTag).toBe(alpha.tag);
+  });
+});
+
 describe("tracker HTTP privacy", () => {
   it("rejects unauthenticated summary access before reading tracker data", async () => {
     const tracker = createTrackerService({ databasePath: ":memory:", getPlayers: () => initialPlayers, autoStart: false }); services.push(tracker);

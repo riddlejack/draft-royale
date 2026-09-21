@@ -4,7 +4,7 @@ import type { SocialCredential, TrackerBattle, TrackerFilters, TrackerPlayerTall
 import { addManualTrackerResult, fetchTrackerSummary, requestTrackerSync, trackerCommandId, undoManualTrackerResult } from "./client.js";
 import "./tracker.css";
 
-export interface StatsBoardProps { credential: SocialCredential | null; onSignIn?: () => void }
+export interface StatsBoardProps { credential: SocialCredential | null; onSignIn?: () => void; playerTag?: string; onPlayerTagChange?: (tag: string) => void }
 
 const formatRate = (value: number | null) => value === null ? "—" : `${Math.round(value * 100)}%`;
 const formatWhen = (value: string | number | null) => {
@@ -73,9 +73,9 @@ function TallyList({ items, empty }: { items: Array<{ key: string; title: string
   return <div className="tracker-usage-list">{items.map((item) => <div key={item.key}><strong>{item.title}<small>{item.detail}</small></strong><span>{item.tally.games} · {formatRate(item.tally.winRate)}<ResultLine tally={item.tally} /></span></div>)}</div>;
 }
 
-export function StatsBoard({ credential, onSignIn }: StatsBoardProps) {
+export function StatsBoard({ credential, onSignIn, playerTag, onPlayerTagChange }: StatsBoardProps) {
   const [summary, setSummary] = useState<TrackerSummary | null>(null);
-  const [filters, setFilters] = useState<Partial<TrackerFilters>>({ relationship: "all" });
+  const [filters, setFilters] = useState<Partial<TrackerFilters>>(() => ({ relationship: "all", ...(playerTag ? { playerTag } : {}) }));
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -135,7 +135,7 @@ export function StatsBoard({ credential, onSignIn }: StatsBoardProps) {
     {error ? <div className="tracker-error"><ShieldAlert size={16} /><span>{error}</span><button onClick={() => setError(null)} aria-label="Dismiss">×</button></div> : null}
 
     <section className="tracker-filter-panel"><div className="tracker-section-heading"><div><h2><Filter size={18} /> Focus</h2><p>Performance cards and recent games use one filtered sample. Player-wide coverage stays separate.</p></div></div><div className="tracker-filter-grid tracker-primary-filters">
-      <label>Player<select value={summary.filters.playerTag} onChange={(event) => updateFilter("playerTag", event.target.value)}>{summary.filterOptions.players.map((player) => <option key={player.tag} value={player.tag}>{player.displayName}</option>)}</select></label>
+      <label>Player<select value={summary.filters.playerTag} onChange={(event) => { updateFilter("playerTag", event.target.value); onPlayerTagChange?.(event.target.value); }}>{summary.filterOptions.players.map((player) => <option key={player.tag} value={player.tag}>{player.displayName}</option>)}</select></label>
       <label>View<select value={summary.filters.relationship} onChange={(event) => { const relationship = event.target.value as TrackerFilters["relationship"]; setFilters((current) => ({ ...current, relationship, ...(relationship === "all" ? { opponentTag: null } : {}) })); }}><option value="all">All own games</option><option value="versus">Against player</option><option value="alongside">Alongside in 2v2</option></select></label>
       <label>Player to compare<select value={summary.filters.opponentTag ?? ""} disabled={summary.filters.relationship === "all"} onChange={(event) => updateFilter("opponentTag", event.target.value)}><option value="">Choose player</option>{opponents.map((player) => <option key={player.tag} value={player.tag}>{player.displayName}</option>)}</select></label>
     </div><details className="tracker-more-filters"><summary>Mode &amp; date</summary><div className="tracker-filter-grid tracker-secondary-filters"><label>Mode<select value={summary.filters.mode ?? ""} onChange={(event) => updateFilter("mode", event.target.value)}><option value="">All modes</option>{summary.filterOptions.modes.map((mode) => <option key={mode.key} value={mode.key}>{displayMode(mode.name)}</option>)}</select></label><label>From<input type="date" value={summary.filters.dateFrom ?? ""} onChange={(event) => updateFilter("dateFrom", event.target.value)} /></label><label>Through<input type="date" value={summary.filters.dateTo ?? ""} onChange={(event) => updateFilter("dateTo", event.target.value)} /></label></div></details></section>

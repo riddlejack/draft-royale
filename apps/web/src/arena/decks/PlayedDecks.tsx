@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, ExternalLink, History, Pencil, Save } from "lucide-react";
-import type { ArenaCard, ArenaForm, DeckDefinition, SocialCredential, TrackerCard, TrackerDeckLog, TrackerDeckLogEntry } from "@draft-royale/shared";
+import type { ArenaCard, DeckDefinition, SocialCredential, TrackerDeckLog, TrackerDeckLogEntry } from "@draft-royale/shared";
 import { validateDeck } from "@draft-royale/shared";
 import { ArenaCardFace } from "../components/ArenaCardFace";
 import { fetchTrackerDeckLog } from "../tracker/client.js";
+import { catalogById, formBadge, resolveTrackerCard } from "../tracker/trackerCards";
 import { clashDeckLink, createDeckId } from "./deckUtils";
 
 type OriginFilter = "chosen" | "assigned" | "all";
@@ -17,20 +18,13 @@ const formatDay = (value: string) => {
 const displayMode = (name: string) => name.replace(/_/g, " ");
 const modeKeyOf = (mode: { type: string; modeId: number | null; modeName: string }) => `${mode.type}:${mode.modeId ?? mode.modeName}`;
 
-// The catalog has no combined hero-evolution form; the evolution art is the closer match when it exists.
-const catalogForm = (card: ArenaCard, tracked: TrackerCard): ArenaForm => {
-  const wanted: ArenaForm[] = tracked.form === "heroEvolution" ? ["evolution", "hero"] : tracked.form === "base" ? [] : [tracked.form];
-  return wanted.find((form) => card.forms.some((candidate) => candidate.key === form)) ?? "base";
-};
-
 const toDeckDefinition = (entry: TrackerDeckLogEntry, cardsById: ReadonlyMap<number, ArenaCard>, ownerLabel: string): DeckDefinition | null => {
   const forms: DeckDefinition["forms"] = {};
   const keys: string[] = [];
   for (const tracked of entry.cards) {
-    const card = tracked.id === null ? undefined : cardsById.get(tracked.id);
+    const { card, form } = resolveTrackerCard(tracked, cardsById);
     if (!card) return null;
     keys.push(card.key);
-    const form = catalogForm(card, tracked);
     if (form !== "base") forms[card.key] = form;
   }
   const lead = [...entry.cards].sort((left, right) => (right.elixirCost ?? 0) - (left.elixirCost ?? 0)).slice(0, 2).map((card) => card.name).join(" · ");
@@ -42,10 +36,9 @@ function PlayedDeckRow({ entry, deck, catalog, cardsById, cardsByKey, onEdit, on
   return <article className="library-deck-row played-deck-row">
     <div className="played-deck-record"><strong>{formatRate(entry.winRate)}</strong><span><b>{entry.wins}W</b><b>{entry.losses}L</b>{entry.draws > 0 ? <b>{entry.draws}D</b> : null}</span><small>{entry.games} {entry.games === 1 ? "game" : "games"}</small></div>
     <div className="library-card-row" aria-label="Deck cards">{entry.cards.map((tracked) => {
-      const card = tracked.id === null ? undefined : cardsById.get(tracked.id);
+      const { card, form } = resolveTrackerCard(tracked, cardsById);
       if (!card) return <span className="library-card-missing" key={`${tracked.id}:${tracked.key}`}>{tracked.name}</span>;
-      const form = catalogForm(card, tracked);
-      return <span className={`library-card is-${form}`} key={card.key} title={tracked.name}><ArenaCardFace card={card} form={form} /><span className="library-form-badge">{form === "evolution" ? "E" : form === "hero" ? "H" : form === "champion" ? "C" : ""}</span></span>;
+      return <span className={`library-card is-${form}`} key={card.key} title={tracked.name}><ArenaCardFace card={card} form={form} /><span className="library-form-badge">{formBadge(form)}</span></span>;
     })}</div>
     <footer className="library-deck-footer">
       <span className="library-elixir"><i aria-hidden="true" /> {entry.averageElixir === null ? "—" : entry.averageElixir.toFixed(1)}</span>
@@ -71,7 +64,7 @@ export function PlayedDecks({ credential, catalog, scope, onEdit, onSave, onCopy
   const [limit, setLimit] = useState(12);
   const [savingSignature, setSavingSignature] = useState("");
   const [savedSignatures, setSavedSignatures] = useState<ReadonlySet<string>>(new Set());
-  const cardsById = useMemo(() => new Map(catalog.map((card) => [card.id, card])), [catalog]);
+  const cardsById = useMemo(() => catalogById(catalog), [catalog]);
   const cardsByKey = useMemo(() => new Map(catalog.map((card) => [card.key, card])), [catalog]);
 
   useEffect(() => {

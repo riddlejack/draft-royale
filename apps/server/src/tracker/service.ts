@@ -848,7 +848,10 @@ export const createTrackerService = (options: TrackerServiceOptions): TrackerSer
 
   const focusBattles = (request: TrackerPlayerRequest) => {
     ensureOpen(); reconcileSubscriptions();
-    const playerTag = normalizeFilters(visiblePlayers(request.visibleProfileIds), request.actorProfileId, { playerTag: normalizeTrackerTag(request.playerTag) }).playerTag;
+    // The deck builder labels these numbers "yours", so a viewer without a tag gets nothing rather than a friend's record.
+    const players = visiblePlayers(request.visibleProfileIds);
+    const requested = normalizeTrackerTag(request.playerTag);
+    const playerTag = players.find((player) => player.tag === requested)?.tag ?? players.find((player) => player.linkedProfileIds.includes(request.actorProfileId))?.tag ?? "";
     return { playerTag, battles: playerTag ? visibleBattles(request.actorProfileId, request.visibleProfileIds, playerTag) : [] };
   };
   const getCardStats = (request: TrackerPlayerRequest): TrackerCardStats => {

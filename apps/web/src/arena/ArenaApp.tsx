@@ -10,7 +10,8 @@ import { SocialPanel } from "./SocialPanel";
 import { useSocial } from "./useSocial";
 import { DeckLibrary } from "./decks/DeckLibrary";
 import { MirrorRoom } from "./decks/mirror/MirrorRoom";
-import { StatsBoard } from "./tracker/StatsBoard";
+import { StatsScreen } from "./tracker/StatsScreen";
+import { isStatsHash } from "./tracker/statsTabs";
 import "./workshop-nav.css";
 import { AccountButton, AccountControl } from "./accounts/AccountControl";
 import { collectionDirtyKey, collectionStorageKey, rememberedAccount, saveAccountCollection, type AccountSession, type ClubAccount } from "./accounts/accountClient";
@@ -30,7 +31,7 @@ type AppSurface = "home" | "decks" | "mirror" | "stats";
 const surfaceFromLocation = (): AppSurface => {
   const url = new URL(window.location.href);
   if (url.hash === "#mirror" || url.searchParams.has("mirror")) return "mirror";
-  if (url.hash === "#stats") return "stats";
+  if (isStatsHash(url.hash)) return "stats";
   return url.hash === "#decks" || url.searchParams.has("deck") || url.searchParams.has("pair") ? "decks" : "home";
 };
 
@@ -425,7 +426,7 @@ export function ArenaApp() {
 
     {!room && surface === "decks" && catalog && <DeckLibrary catalog={catalog.cards} collection={collection} credential={social.identity} onBack={() => goTo("home")} onMirror={() => goTo("mirror")} onCopy={(value, message) => void copy(value, message)} />}
     {!room && surface === "mirror" && catalog && <MirrorRoom catalog={catalog.cards} collection={collection} playerName={name} initialCode={new URL(window.location.href).searchParams.get("mirror") ?? ""} onBack={() => goTo("home")} onCopy={(value, message) => void copy(value, message)} />}
-    {!room && surface === "stats" && <section className="stats-scene"><header className="scene-toolbar"><button className="icon-button" aria-label="Back to home" onClick={() => goTo("home")}><ChevronLeft /></button><span>Match records</span><AccountButton /></header><StatsBoard credential={social.identity} onSignIn={() => window.dispatchEvent(new Event("draft-royale:sign-in"))} /></section>}
+    {!room && surface === "stats" && <section className="stats-scene"><header className="scene-toolbar"><button className="icon-button" aria-label="Back to home" onClick={() => goTo("home")}><ChevronLeft /></button><span>Match records</span><AccountButton /></header><StatsScreen credential={social.identity} catalog={catalog?.cards} onSignIn={() => window.dispatchEvent(new Event("draft-royale:sign-in"))} /></section>}
 
     {room?.phase === "waiting" && <div className="room-scene">
       <header className="scene-toolbar"><button className="icon-button" onClick={leave} aria-label="Back to home"><ChevronLeft /></button><span>{modeName(room.settings.mode)}</span><div className="scene-toolbar-actions">{socialButton}<button className="icon-button" aria-label="My cards" onClick={() => setModal("collection")}><Shield size={21} /></button></div></header>

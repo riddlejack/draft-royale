@@ -175,7 +175,7 @@ export function DeckLibrary({ catalog, collection, onBack, onCopy, credential, o
     ? current.filter((candidate) => candidate.id !== deck.id)
     : [...current.slice(-1), deck]);
 
-  if (editing) return <DeckEditor catalog={catalog} collection={collection} initialDeck={editing} onBack={() => { setEditing(null); clearSharedDeckLocation(); }} onSave={saveDeck} onCopy={onCopy} />;
+  if (editing) return <DeckEditor catalog={catalog} collection={collection} initialDeck={editing} onBack={() => { setEditing(null); clearSharedDeckLocation(); }} onSave={saveDeck} onCopy={onCopy} credential={credential} />;
 
   return <section className="deck-library-screen">
     <header className="deck-workshop-toolbar">

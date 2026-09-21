@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { ArrowLeft, Check, Copy, ExternalLink, Link2, Save, Trash2 } from "lucide-react";
-import type { ArenaCard, ArenaCollection, ArenaForm, DeckDefinition, DeckMode } from "@draft-royale/shared";
+import type { ArenaCard, ArenaCollection, ArenaForm, DeckDefinition, DeckMode, SocialCredential, TrackerTally } from "@draft-royale/shared";
 import { collectionAllowedForms, collectionOwnsCard, collectionOwnsForm, validateDeck, isChaosInfiniteElixirSupportedCard } from "@draft-royale/shared";
 import { ArenaCardFace } from "../components/ArenaCardFace";
 import { CardPicker } from "../components/CardPicker";
 import { clashDeckLink, cloneDeck, deckCollectionIssues, deckShareUrl, parseDeckImport, deckElixirLabel } from "./deckUtils";
+import { PICKER_BADGE_MIN_GAMES } from "../components/CardPicker";
+import { recordSentence, useDeckStats, type DeckRecordState } from "./deckStats";
 
 const modes: Array<{ key: DeckMode; label: string }> = [
   { key: "2v2", label: "2v2" },
@@ -22,15 +24,39 @@ interface DeckEditorProps {
   onSave: (deck: DeckDefinition) => void | Promise<void>;
   saveLabel?: string;
   onCopy: (value: string, message: string) => void;
+  /** Signed-in players with a saved tag get their own card records in the builder; everyone else sees it unchanged. */
+  credential?: SocialCredential | null;
 }
 
-export function DeckEditor({ catalog, collection, initialDeck, onBack, onSave, onCopy, saveLabel = "Save" }: DeckEditorProps) {
+const formatDay = (value: string) => { const date = new Date(value); return Number.isNaN(date.valueOf()) ? "" : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date); };
+const TallyLine = ({ label, tally }: { label: string; tally: TrackerTally }) => <p><span>{label}</span> <b>{recordSentence(tally)}</b></p>;
+
+function ExactDeckRecord({ state }: { state: DeckRecordState }) {
+  if (state.status === "idle") return null;
+  const record = state.status === "ready" ? state.record : null;
+  return <section className="deck-record" aria-live="polite" aria-label="Your record with this exact deck">
+    <h3>Your record with this exact deck</h3>
+    {state.status === "loading" ? <p className="deck-record-muted">Checking recorded battles…</p>
+      : !record ? <p className="deck-record-muted">The record for this deck could not load.</p>
+        : record.chosen.games + record.assigned.games === 0 ? <p className="deck-record-muted">You haven’t played this exact deck in a recorded battle yet.</p> : <>
+          {record.chosen.games > 0 ? <TallyLine label="When you chose it:" tally={record.chosen} /> : null}
+          {record.assigned.games > 0 ? <TallyLine label="When a mode assigned it (mirror, draft):" tally={record.assigned} /> : null}
+          <ul aria-label="Most recent results">{record.recent.map((battle, index) => <li key={`${battle.battleTime}:${index}`}><i className={`deck-record-result is-${battle.result}`}>{battle.result === "win" ? "W" : battle.result === "loss" ? "L" : battle.result === "draw" ? "D" : "?"}</i><span>{battle.modeName.replace(/_/g, " ")}{battle.origin === "assigned" ? " · assigned" : ""}</span><time dateTime={battle.battleTime}>{formatDay(battle.battleTime)}</time></li>)}</ul>
+        </>}
+    <small>Same eight cards in any order. Evolved, hero and base copies of a card count as the same deck.</small>
+  </section>;
+}
+
+export function DeckEditor({ catalog, collection, initialDeck, onBack, onSave, onCopy, saveLabel = "Save", credential }: DeckEditorProps) {
   const [deck, setDeck] = useState(() => cloneDeck(initialDeck));
   const [importValue, setImportValue] = useState("");
   const [importError, setImportError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const cardsByKey = useMemo(() => new Map(catalog.map((card) => [card.key, card])), [catalog]);
+  const [focusedKey, setFocusedKey] = useState("");
+  const playerStats = useDeckStats(credential, catalog, deck.cards, cardsByKey);
+  const focusedStat = focusedKey && deck.cards.includes(focusedKey) ? playerStats.stats.get(focusedKey) : undefined;
   const validation = useMemo(() => validateDeck(deck, catalog), [catalog, deck]);
   const collectionIssues = useMemo(() => deckCollectionIssues(deck, catalog, collection), [catalog, collection, deck]);
   const modeError = deck.mode === "mirror" && !deck.cards.includes("mirror") ? "Mirror decks must include Mirror." : deck.mode === "chaos" && deck.cards.some((key) => {
@@ -53,6 +79,7 @@ export function DeckEditor({ catalog, collection, initialDeck, onBack, onSave, o
       const card = cardsByKey.get(key);
       forms[key] = deck.forms?.[key] ?? (card?.forms.some((candidate) => candidate.key === "base") ? "base" : card?.forms[0]?.key ?? "base");
     }
+    setFocusedKey(cards.find((key) => !deck.cards.includes(key)) ?? (cards.includes(focusedKey) ? focusedKey : ""));
     setDeck((current) => ({ ...current, cards, forms }));
   };
   const setForm = (key: string, form: ArenaForm) => setDeck((current) => ({ ...current, forms: { ...current.forms, [key]: form } }));
@@ -93,16 +120,21 @@ export function DeckEditor({ catalog, collection, initialDeck, onBack, onSave, o
               if (!key || !card) return <div className="deck-slot-empty" key={index}><strong>{index + 1}</strong><span>Choose card</span></div>;
               const form = deck.forms?.[key] ?? "base";
               const legalForms = collectionAllowedForms(collection, card);
-              return <article className={`deck-slot is-${form}`} key={key}>
+              const stat = playerStats.stats.get(key);
+              const face = <ArenaCardFace card={card} form={form} legalForms={legalForms} />;
+              return <article className={`deck-slot is-${form}${playerStats.hasCardStats && focusedKey === key ? " is-focused" : ""}`} key={key}>
                 <button type="button" className="deck-slot-remove" onClick={() => setCards(deck.cards.filter((candidate) => candidate !== key))} aria-label={`Remove ${card.name}`}><Trash2 size={13} /></button>
-                <ArenaCardFace card={card} form={form} legalForms={legalForms} />
+                {playerStats.hasCardStats ? <button type="button" className="deck-slot-focus" aria-pressed={focusedKey === key} aria-label={`Show your record with and against ${card.name}`} onClick={() => setFocusedKey(focusedKey === key ? "" : key)}>{face}</button> : face}
                 <strong>{card.name}</strong>
+                {stat && stat.with.games >= PICKER_BADGE_MIN_GAMES ? <span className={`card-picker-stat${playerStats.picker.get(key)?.small ? " is-small" : ""}`} title={playerStats.picker.get(key)?.description}>{playerStats.picker.get(key)?.badge}</span> : null}
                 <select value={form} aria-label={`${card.name} form`} onChange={(event) => setForm(key, event.target.value as ArenaForm)}>{card.forms.map((candidate) => <option key={candidate.key} value={candidate.key} disabled={!collectionOwnsForm(collection, key, candidate.key)}>{candidate.key === "base" ? "Base" : candidate.label.replace(card.name, "").trim() || candidate.key}{collectionOwnsForm(collection, key, candidate.key) ? "" : " · not owned"}</option>)}</select>
               </article>;
             })}
           </div>
+          {playerStats.hasCardStats && deck.cards.length > 0 ? <p className="deck-stat-line" aria-live="polite">{focusedStat ? <><strong>{focusedStat.name}</strong> With it: <b>{recordSentence(focusedStat.with)}</b>. Against it: <b>{recordSentence(focusedStat.against)}</b>.</> : focusedKey && deck.cards.includes(focusedKey) ? <><strong>{cardsByKey.get(focusedKey)?.name}</strong> No recorded games with or against it in decks you built.</> : "Tap a card in your deck to see your record with it and against it. Badges show your win rate and games with the card, from decks you built."}</p> : null}
           <div className={`deck-validity ${valid ? "is-valid" : "is-invalid"}`} role="status">{valid ? <><Check size={15} /> Ready to play and share.</> : collectionIssues[0] ?? validation.errors[0] ?? (modeError || "Give this deck a name.")}</div>
           {saveError && <p className="deck-save-error" role="alert">{saveError}</p>}
+          {playerStats.enabled ? <ExactDeckRecord state={playerStats.deckRecord} /> : null}
           <div className="deck-editor-actions">
             <button type="button" className="deck-action-secondary" onClick={() => setCards([])}>Clear</button>
             <button type="button" className="deck-action-secondary" disabled={!valid} onClick={() => onCopy(deckShareUrl(deck), "Share link copied.")}><Link2 size={16} /> Share</button>
@@ -119,7 +151,7 @@ export function DeckEditor({ catalog, collection, initialDeck, onBack, onSave, o
       </div>
 
       <aside className="deck-editor-picker">
-        <CardPicker cards={catalog} selectedKeys={deck.cards} onSelectedKeysChange={setCards} maxSelected={8} title="Add cards" selectionLabel="cards" disabledKeys={catalog.filter((card) => !collectionOwnsCard(collection, card.key) || (deck.mode === "chaos" && !isChaosInfiniteElixirSupportedCard(card))).map((card) => card.key)} />
+        <CardPicker cards={catalog} selectedKeys={deck.cards} onSelectedKeysChange={setCards} maxSelected={8} title="Add cards" selectionLabel="cards" cardStats={playerStats.hasCardStats ? playerStats.picker : undefined} disabledKeys={catalog.filter((card) => !collectionOwnsCard(collection, card.key) || (deck.mode === "chaos" && !isChaosInfiniteElixirSupportedCard(card))).map((card) => card.key)} />
       </aside>
     </div>
   </section>;
