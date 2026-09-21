@@ -1,10 +1,25 @@
-# Draft Royale
+# 👑 Draft Royale
 
-Draft Royale is an unofficial fan-made Clash Royale drafting companion. Draft in the browser, then use the completed deck link for a friendly battle. This material is unofficial and is not endorsed by Supercell.
+**Draft Clash Royale decks against your friends, with Evos, Heroes, and Champions.**
 
-This is a sanitized, source-only distribution. It contains original application code, generalized fixtures, the reviewed September 20, 2026 Arena catalog, and neutral placeholder artwork. It intentionally excludes private runtime data, personal fixtures, deployment state, private project history, game artwork, game UI artwork, and game fonts. The separate Chaos Infinite Elixir allowlist remains a dated September 5, 2026 snapshot.
+My friend and I love Clash Royale's draft modes, but friendly battles barely offer them. The in-game draft pulls from a fixed slice of the card pool, leaves out Champions and Evolutions, and gives you no say over the rules. Draft Royale moves the draft to the browser: two players draft live from the full card pool, special forms included, then each opens the finished deck in Clash Royale with one tap and plays an ordinary friendly battle.
 
-## Run locally
+**[Play it at draft-royale.com →](https://draft-royale.com)**
+
+## What you can do
+
+- **Mega Draft.** One shared board of 16 to 96 cards. Picks alternate, and every card you take is one your opponent can't have. The first pick alternates across rematches.
+- **Classic and Triple Draft.** Classic: choose one of two and your opponent gets the other. Triple: choose one of three.
+- **Evos, Heroes, and Champions.** Pick a card's form as you draft it, and the deck fills the game's special slots correctly. Group the special forms into their own rounds, or switch them off for a plain draft.
+- **Your rules.** Filter the pool by elixir cost, rarity, card type, or family, or include and exclude cards by hand. Set a timer per pick or for the whole draft. Add the Mirror card, or draft for a Chaos mode with its own pool.
+- **Your cards.** Enter a player tag to import that profile's collection, and drafts only offer cards and forms both players actually own.
+- **Friends.** Add a friend with a one-time link, challenge them, and rematch from the same room. Or skip accounts and send anyone a room code.
+- **Decks.** Save and edit decks, share them with friends, and see each card's record while you build. Same-deck battles hand both players the identical deck in the same order.
+- **Match records.** The game only remembers your last 25 battles. The server keeps polling the public battle log for every tracked tag, so history builds up: head-to-head rivalries, the cards and decks you lose to, tilt after a loss, time of day, trophy timeline. Every figure shows its sample size.
+
+Draft Royale never touches the game. It builds a deck and hands Clash Royale a deck link; you pick the battle mode in the game yourself.
+
+## Run your own
 
 Requires Node 24+ and pnpm 10+.
 
@@ -14,43 +29,23 @@ pnpm build
 pnpm --filter @draft-royale/server start
 ```
 
-Open <http://localhost:4141>. `HOST` defaults to `127.0.0.1`, `PORT` defaults to `4141`, and `ARENA_DATABASE_PATH` can select a different private SQLite location. The default database path is ignored by Git.
+Open <http://localhost:4141>. Use `pnpm dev` while developing. Everything is one Express server, a React front end, and a SQLite file at `data/private/arena.sqlite` (ignored by Git; move it with `ARENA_DATABASE_PATH`). `HOST` defaults to `127.0.0.1` and `PORT` to `4141`.
 
-For development:
+Drafting works with no configuration. Collection import and match records need a free [Clash Royale API](https://developer.clashroyale.com) token. Put settings in `data/private/tracker.env`:
 
-```sh
-pnpm dev
-```
+| Setting | What it does |
+| --- | --- |
+| `CLASH_ROYALE_API_TOKEN` | Enables collection import and battle-log tracking. Used by the server only. |
+| `CLASH_ROYALE_API_BASE_URL` | Optional. Defaults to the [RoyaleAPI proxy](https://docs.royaleapi.com/proxy.html), which gives the token a fixed IP to allowlist. |
+| `GOOGLE_OAUTH_CLIENT_ID` | Optional. Shows Google sign-in. A public Web client ID; no client secret is used. |
+| `DRAFT_ROYALE_CLUB_TAGS` | Optional. Comma-separated tags of one friend group, written without `#`. The first account on each tag is befriended with the others. |
 
-## Optional Clash Royale API access
+Accounts are named after the Clash Royale profile they track, and friends belong to the account, never to the tag, so tracking someone's public tag shows you none of their friends. A public profile does not prove who owns a tag.
 
-Collection import and battle-log polling use the Clash Royale API from the server only. Store a user-created token only in ignored `data/private/tracker.env` as `CLASH_ROYALE_API_TOKEN=...`. `CLASH_ROYALE_API_BASE_URL` is optional and defaults to the documented RoyaleAPI proxy. A public player profile does not prove tag ownership.
+Check your changes with `pnpm lint`, `pnpm typecheck`, and `pnpm test`. With the built server running, `pnpm qa:arena` drives a full two-player draft in a headless browser.
 
-New local accounts require a 12–128 character password distinct from the display name. To migrate a legacy account in an existing private database, run this in an interactive terminal:
+## What's not in this repository
 
-```sh
-ARENA_DATABASE_PATH=/absolute/path/to/arena.sqlite pnpm migrate:legacy-account -- player-name
-```
+No Clash Royale card art, game UI art, or game fonts: every card shows a neutral placeholder, and the live site's artwork is not redistributed here. No player data, deployment configuration, or private project history either.
 
-The migration changes that account's password salt, hash, and version and rotates its linked social login credential, permanently revoking any bearer issued under the legacy password. It preserves profile IDs, friends, decks, rooms, and history.
-
-## Accounts, names, and friends
-
-Google sign-in appears only when `GOOGLE_OAUTH_CLIENT_ID` (a public Web client ID; no client secret is used) is set in `data/private/tracker.env`. Accounts are shown under the in-game name of the Clash Royale tag they track, and friends belong to the account rather than to the tag, so tracking someone else's public tag never exposes their friends list. `DRAFT_ROYALE_CLUB_TAGS` optionally lists the tags of one friend group, comma-separated and written without `#` (an env file reads a leading `#` as a comment); the first sign-in-capable account on each tag is befriended with the others.
-
-## Validate
-
-```sh
-pnpm lint
-pnpm typecheck
-pnpm test
-```
-
-After starting the built server, `pnpm qa:arena` runs the isolated Playwright/Chromium browser harness against `http://localhost:4141` by default. Set `ARENA_QA_URL` and `ARENA_QA_OUTPUT_DIR` to override the target and evidence directory.
-
-## Boundaries
-
-- The catalog uses one original neutral placeholder for every card form. No Clash Royale card art or Supercell font is included.
-- The application can draft cards and create deck links. It cannot unlock cards, configure the game client, prove public-tag ownership, or guarantee the chosen battle mode and special slots inside Clash Royale.
-- `LICENSE` covers original code and documentation only. Read `NOTICE` for the fan-content and trademark boundary.
-- Use a persistent private SQLite volume and backups for any hosted instance. Do not serve the repository root.
+[MIT license](LICENSE) for the original code. This material is unofficial and is not endorsed by Supercell; see [NOTICE](NOTICE) and Supercell's [Fan Content Policy](https://supercell.com/en/fan-content-policy/).
