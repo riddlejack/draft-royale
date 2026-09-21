@@ -53,6 +53,11 @@ export interface AccountServiceOptions {
   normalizeCollection: (input: unknown) => ArenaCollection;
   now?: () => number;
   googleClientId?: string;
+  /**
+   * Player tags whose accounts are friends with each other automatically. Only the first account to
+   * track a tag counts, so tracking a friend's public tag never grants access to their friends list.
+   */
+  clubTags?: readonly string[];
   verifyGoogleIdToken?: (idToken: string, audience: string) => Promise<GoogleClaims>;
 }
 
@@ -283,6 +288,7 @@ export function createAccountService(options: AccountServiceOptions) {
     db.prepare(`INSERT INTO club_accounts(username,display_name,tag,salt,password_hash,profile_id,password_version,credential_version,password_enabled,created_at)
       VALUES(?,?,?,?,?,?,1,1,1,?)`).run(username, displayName, tag, salt, scryptSync(password, salt, 32).toString("hex"), profile.credential.profileId, now());
     const row = rowForUsername(username)!;
+    if (tag) reconcileClub();
     return { ...adoptInitialCredential(row, profile.credential.token), recoveryCode: createRecovery(row.profile_id) };
   };
 
@@ -374,12 +380,57 @@ export function createAccountService(options: AccountServiceOptions) {
     }
     return { recoveryCode: createRecovery(profileId) };
   };
+  const clubTags = new Set((options.clubTags ?? []).flatMap((value) => {
+    try { return [tagOf(value)].filter((tag): tag is string => tag !== null); } catch { return []; }
+  }));
+  // A reset account nobody has reclaimed yet cannot be signed in to; it only keeps a friend's tag tracked.
+  const isPlaceholder = (row: AccountRow) => row.password_version === -1 && providersFor(row.profile_id).length === 0
+    && !db.prepare("SELECT 1 FROM account_sessions WHERE profile_id=?").get(row.profile_id);
+  const reconcileClub = () => {
+    if (clubTags.size < 2) return;
+    const members: string[] = [];
+    for (const tag of clubTags) {
+      const holders = db.prepare("SELECT * FROM club_accounts WHERE tag=? ORDER BY created_at, rowid").all(tag) as unknown as AccountRow[];
+      const owner = holders.find((row) => !isPlaceholder(row));
+      if (!owner) continue;
+      members.push(owner.profile_id);
+      // Once the real player has an account, their stand-in would only show up as a duplicate friend.
+      for (const stale of holders.filter(isPlaceholder)) {
+        db.prepare("DELETE FROM account_reset_claims WHERE profile_id=?").run(stale.profile_id);
+        db.prepare("DELETE FROM account_recovery WHERE profile_id=?").run(stale.profile_id);
+        db.prepare("DELETE FROM club_accounts WHERE profile_id=?").run(stale.profile_id);
+        options.social.deleteProfile(stale.profile_id);
+      }
+    }
+    for (const left of members) for (const right of members) if (left < right) options.social.ensureFriendship(left, right);
+  };
   const updateTag = (profileId: string, value: unknown) => {
     const tag = tagOf(value);
     const changed = db.prepare("UPDATE club_accounts SET tag=? WHERE profile_id=?").run(tag, profileId);
     if (changed.changes !== 1) throw new AccountError(404, "Account not found.", "ACCOUNT_NOT_FOUND");
+    reconcileClub();
     return accountOf(rowForProfile(profileId)!);
   };
+  // An account is shown under the in-game name of the tag it tracks, so nobody types a name for themselves.
+  const setPlayerName = (profileId: string, value: unknown) => {
+    const name = typeof value === "string" ? providerNameOf(value) : "Player";
+    const row = rowForProfile(profileId);
+    if (!row) throw new AccountError(404, "Account not found.", "ACCOUNT_NOT_FOUND");
+    if (name === "Player" || name === row.display_name) return accountOf(row);
+    db.prepare("UPDATE club_accounts SET display_name=? WHERE profile_id=?").run(name, profileId);
+    options.social.setDisplayName(profileId, name);
+    return accountOf(rowForProfile(profileId)!);
+  };
+  options.social.setDisplayNameGuard((profileId) => Boolean(rowForProfile(profileId)));
+  // Accounts that imported a profile before names followed the tag pick their in-game name up here.
+  for (const row of rows()) {
+    if (!row.tag || isPlaceholder(row)) continue;
+    try {
+      const profile = parseCollection(row.collection_json)?.profile;
+      if (profile && profile.tag === row.tag) setPlayerName(row.profile_id, profile.name);
+    } catch { /* An unreadable saved collection must not stop the server from starting. */ }
+  }
+  reconcileClub();
   const saveCollection = (profileId: string, input: unknown) => {
     const collection = options.normalizeCollection(input);
     const changed = db.prepare("UPDATE club_accounts SET collection_json=?,collection_updated_at=? WHERE profile_id=?")
@@ -466,7 +517,7 @@ export function createAccountService(options: AccountServiceOptions) {
   };
 
   return {
-    login, register, recover, rotateRecovery, logout, forProfile, sessionFor, touchSession, updateTag, saveCollection,
+    login, register, recover, rotateRecovery, logout, forProfile, sessionFor, touchSession, updateTag, setPlayerName, saveCollection,
     createGoogleChallenge, googleLogin,
     providerConfig: () => ({
       google: googleClientId ? { enabled: true, clientId: googleClientId } : { enabled: false },

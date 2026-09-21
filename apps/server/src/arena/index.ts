@@ -24,6 +24,7 @@ export * from "./collection-import-router.js";
 
 export type ArenaAppOptions = ArenaServiceOptions & {
   googleClientId?: string;
+  clubTags?: readonly string[];
   verifyGoogleIdToken?: (idToken: string, audience: string) => Promise<GoogleClaims>;
 };
 
@@ -39,6 +40,7 @@ export const createArenaApp = (options: ArenaAppOptions): Express => {
     normalizeCollection: service.normalizeCollection,
     now: options.now,
     googleClientId: options.googleClientId ?? process.env.GOOGLE_OAUTH_CLIENT_ID,
+    clubTags: options.clubTags ?? (process.env.DRAFT_ROYALE_CLUB_TAGS ?? "").split(",").map((tag) => tag.trim()).filter(Boolean),
     verifyGoogleIdToken: options.verifyGoogleIdToken,
   });
   const deckSeeds = () => ({ version: 1, generatedAt: new Date().toISOString(), collections: ["video-2v2-decks.json", "classic-decks.json", "official-classic-decks.json"].flatMap((filename) => {

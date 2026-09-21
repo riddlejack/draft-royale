@@ -161,9 +161,10 @@ describe("battle invitations", () => {
       .send({ collection: null, commandId: "accept-battle" }).expect(200);
     expect(accepted.body.session).toMatchObject({ credential: { seat: "b" }, room: { phase: "waiting" } });
     expect(accepted.body.session.room.participants.map((participant: { name: string }) => participant.name)).toEqual(["Host", "Guest"]);
-    const hostRoomToken = deriveSocialRoomToken(host.credential.token, inviteId, "a");
-    expect(JSON.stringify(accepted.body)).not.toContain(hostRoomToken);
     const credentialInspection = new DatabaseSync(databasePath, { readOnly: true });
+    const hostRoomKey = (credentialInspection.prepare("SELECT room_key FROM social_profile_room_keys WHERE profile_id = ?").get(host.credential.profileId) as { room_key: string }).room_key;
+    const hostRoomToken = deriveSocialRoomToken(hostRoomKey, inviteId, "a");
+    expect(JSON.stringify(accepted.body)).not.toContain(hostRoomToken);
     const hashes = (credentialInspection.prepare("SELECT token_hash FROM arena_credentials WHERE room_id = ? ORDER BY seat").all(accepted.body.session.credential.roomId) as Array<{ token_hash: string }>).map((row) => row.token_hash);
     expect(hashes).toEqual([
       createHash("sha256").update(hostRoomToken).digest("hex"),
@@ -189,6 +190,18 @@ describe("battle invitations", () => {
     expect(guestSession.body.session.credential).toEqual(accepted.body.session.credential);
     expect(hostSession.body.session.credential.token).not.toBe(guestSession.body.session.credential.token);
     expect((await request(app).get("/api/social/state").set(bearer(host.credential.token))).body.state.outgoingInvites[0]).toMatchObject({ id: inviteId, status: "accepted" });
+
+    // A room created while seats were still derived from a sign-in token is moved onto the profile's seat, never reported as a bad login.
+    const legacy = new DatabaseSync(databasePath);
+    legacy.prepare("UPDATE arena_credentials SET token_hash = ? WHERE room_id = ? AND seat = 'a'").run("0".repeat(64), accepted.body.session.credential.roomId);
+    legacy.close();
+    const rebound = await request(app).get(`/api/social/invites/${inviteId}/session`).set(bearer(host.credential.token)).expect(200);
+    expect(rebound.body.session.credential.token).toBe(hostRoomToken);
+    const gone = new DatabaseSync(databasePath);
+    gone.prepare("DELETE FROM arena_rooms WHERE id = ?").run(accepted.body.session.credential.roomId);
+    gone.close();
+    await request(app).get(`/api/social/invites/${inviteId}/session`).set(bearer(host.credential.token))
+      .expect(410, { error: "This battle room is no longer available", code: "INVITE_ROOM_UNAVAILABLE" });
   });
 
   it("enforces recipient decline and sender cancel transitions", async () => {

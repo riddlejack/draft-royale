@@ -14,7 +14,7 @@ import { StatsScreen } from "./tracker/StatsScreen";
 import { isStatsHash } from "./tracker/statsTabs";
 import "./workshop-nav.css";
 import { AccountButton, AccountControl } from "./accounts/AccountControl";
-import { collectionDirtyKey, collectionStorageKey, rememberedAccount, saveAccountCollection, type AccountSession, type ClubAccount } from "./accounts/accountClient";
+import { collectionDirtyKey, collectionStorageKey, onAccountChange, rememberedAccount, saveAccountCollection, type AccountSession, type ClubAccount } from "./accounts/accountClient";
 import { readSocialIdentity } from "./socialClient";
 import "./arena.css";
 
@@ -71,6 +71,13 @@ export function ArenaApp() {
   const [sound, setSound] = useState(() => storage.get("sound", false));
   const [surface, setSurface] = useState<AppSurface>(surfaceFromLocation);
   const social = useSocial(name);
+  // A signed-in player is always shown under their account name, which follows their Clash Royale profile.
+  const [signedInAccount, setSignedInAccount] = useState(rememberedAccount);
+  useEffect(() => onAccountChange(() => {
+    const next = rememberedAccount();
+    setSignedInAccount(next);
+    if (next) setName(next.displayName);
+  }), []);
   const applyAccountSession = useCallback((session: AccountSession) => {
     const scopedKey = collectionStorageKey(session.account.profileId);
     const local = storage.get<ArenaCollection>(scopedKey, ALL_CARDS);
@@ -367,7 +374,10 @@ export function ArenaApp() {
   }, [collection, openSocialSession, social.acceptInvite, social.openInvite]);
 
   const openedSocialInvites = storage.get<string[]>("social-opened-invites", []);
-  const acceptedOutgoingIds = social.state?.outgoingInvites.filter((item) => item.status === "accepted" && !openedSocialInvites.includes(item.id)).map((item) => item.id) ?? [];
+  // Only a battle a friend just accepted opens by itself; older rooms stay behind their "Open battle room" button.
+  const autoOpenWindowMs = 15 * 60_000;
+  const acceptedOutgoingIds = social.state?.outgoingInvites.filter((item) => item.status === "accepted" && !openedSocialInvites.includes(item.id)
+    && item.respondedAt !== null && social.state!.serverNow - item.respondedAt < autoOpenWindowMs).map((item) => item.id) ?? [];
   const acceptedOutgoingKey = acceptedOutgoingIds.join("|");
   const socialSessionBusy = [...(social.state?.incomingInvites ?? []), ...(social.state?.outgoingInvites ?? [])].some((item) => ["accept", "open"].some((action) => social.isPending(`invite:${action}:${item.id}`)));
   const socialServerNow = social.state?.serverNow;
@@ -388,6 +398,8 @@ export function ArenaApp() {
     attemptedAutoObservation.current = observation;
     const expectedNavigation = navigationEpoch.current;
     void social.openInvite(inviteId, true).then((session) => {
+      // One failed attempt is enough; retrying on every poll would hammer a room that is gone.
+      if (!session) suppressedAutoInvites.current.add(inviteId);
       if (session && navigationEpoch.current === expectedNavigation && !activeCredential.current && !roomRef.current) openSocialSession(session, inviteId);
     });
   }, [acceptedOutgoingKey, friendToken, modal, openSocialSession, pending, room, social.openInvite, socialServerNow, socialSessionBusy, surface]);
@@ -417,7 +429,7 @@ export function ArenaApp() {
           <div className="mode-copy"><strong>{mode.title}</strong><span>{mode.description}</span></div>{settings.mode === mode.key && <span className="mode-selected"><Check size={16} /></span>}
         </button>)}</div>
         <button className="rules-summary" onClick={() => setModal("rules")}><Settings2 size={17} /><span>{rulesSummary(settings)}</span><span>›</span></button>
-        <label className="name-field"><span>Your name</span><input maxLength={24} value={name} autoComplete="nickname" onChange={(event) => { setName(event.target.value); storage.set("name", event.target.value); }} /></label>
+        <label className="name-field"><span>Your name</span><input maxLength={24} value={name} autoComplete="nickname" readOnly={Boolean(signedInAccount)} title={signedInAccount ? "Your name comes from the Clash Royale tag on your account." : undefined} onChange={(event) => { setName(event.target.value); storage.set("name", event.target.value); }} /></label>
         <div className="home-actions"><button className="royale-button deck-workshop-entry" disabled={!catalog} onClick={() => { setSurface("decks"); window.history.pushState(null, "", `${window.location.pathname}${window.location.search}#decks`); }}><BookOpen size={21} /> Deck Workshop <span>Build, save & share decks</span></button><button className="royale-button gold" disabled={pending || !catalog} onClick={() => { setFriendToken(""); setModal("social"); }}><Swords size={21} /> Challenge a friend</button><button className="royale-button blue" disabled={pending || !catalog} onClick={() => void start(true)}>Practice draft <span>Play against a bot</span></button></div>
         <div className="home-links"><button disabled={pending || !catalog} onClick={() => void start(false)}><Link size={15} /> Invite by link</button><button onClick={() => setModal("join")}>Join with a code</button>{savedRooms[0] && <button disabled={pending} onClick={() => { const expectedNavigation = ++navigationEpoch.current; void run(async () => { const saved = savedRooms[0]!; const next = await loadArenaRoom(saved); if (navigationEpoch.current === expectedNavigation) openSession({ room: next, credential: saved }); }); }}>Resume draft</button>}</div>
       </div>
@@ -460,8 +472,8 @@ export function ArenaApp() {
     {notice && <div className="notice-toast" role="status">{notice}</div>}
     {modal === "rules" && <SettingsEditor cards={cards} value={room?.settings ?? settings} onClose={() => setModal(null)} onSave={(next) => { if (room) { void run(async () => { await command("settings", { settings: { ...next, elixirRanges: next.elixirRanges ?? null, minElixir: next.minElixir ?? null, maxElixir: next.maxElixir ?? null, includeCards: next.includeCards ?? null, excludeCards: next.excludeCards ?? null, includedCardIds: next.includedCardIds ?? null, excludedCardIds: next.excludedCardIds ?? null, cardKinds: next.cardKinds ?? null, rarities: next.rarities ?? null, families: next.families ?? null } }); setModal(null); }); } else { setSettings(next); storage.set("settings", next); setModal(null); } }} />}
     {modal === "collection" && <CollectionEditor cards={cards} value={collection} onClose={() => setModal(null)} onSave={(next) => { void run(async () => { if (room?.phase === "waiting") await command("collection", { collection: next }); await persistCollection(next); setModal(null); }); }} />}
-    {modal === "social" && room?.phase !== "drafting" && <SocialPanel social={social} name={name} onNameChange={(next) => { setName(next); storage.set("name", next); }} settings={room?.settings ?? settings} collection={collection} friendToken={friendToken} onFriendTokenChange={(token) => { setFriendToken(token); if (!token) { const query = new URLSearchParams(window.location.hash.slice(1)); if (query.has("friend")) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`); } }} onAcceptInvite={(inviteId) => openSocialInvite(inviteId, true)} onOpenInvite={(inviteId) => openSocialInvite(inviteId, false)} onLegacyInvite={() => { setModal(null); void start(false); }} onClose={closeSocial} onCopy={copy} />}
-    {modal === "join" && <div className="arena-modal-backdrop" onClick={() => { navigationEpoch.current += 1; setModal(null); }}><form className="arena-modal join-modal" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); const expectedNavigation = ++navigationEpoch.current; storage.set("name", name.trim() || "Player"); void run(async () => { const session = await joinArenaRoom({ inviteCode: invite.trim().toUpperCase(), name: name.trim() || "Player", collection }); if (navigationEpoch.current === expectedNavigation) openSession(session); }); }}><header className="modal-heading"><h2>Join your friend</h2><button type="button" className="icon-button" onClick={() => { navigationEpoch.current += 1; setModal(null); }} aria-label="Close join">×</button></header><label>Your name<input value={name} maxLength={24} onChange={(event) => setName(event.target.value)} autoComplete="nickname" /></label><label>Room code<input className="code-input" value={invite} onChange={(event) => setInvite(event.target.value.toUpperCase())} maxLength={12} placeholder="ABC123" autoCapitalize="characters" autoComplete="off" required /></label><button className="royale-button gold full-width" disabled={pending || !invite.trim()}>Enter battle room</button><button className="text-button" type="button" onClick={() => setModal("collection")}>Check my collection</button></form></div>}
+    {modal === "social" && room?.phase !== "drafting" && <SocialPanel social={social} name={name} nameLocked={Boolean(signedInAccount)} onNameChange={(next) => { setName(next); storage.set("name", next); }} settings={room?.settings ?? settings} collection={collection} friendToken={friendToken} onFriendTokenChange={(token) => { setFriendToken(token); if (!token) { const query = new URLSearchParams(window.location.hash.slice(1)); if (query.has("friend")) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`); } }} onAcceptInvite={(inviteId) => openSocialInvite(inviteId, true)} onOpenInvite={(inviteId) => openSocialInvite(inviteId, false)} onLegacyInvite={() => { setModal(null); void start(false); }} onClose={closeSocial} onCopy={copy} />}
+    {modal === "join" && <div className="arena-modal-backdrop" onClick={() => { navigationEpoch.current += 1; setModal(null); }}><form className="arena-modal join-modal" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); const expectedNavigation = ++navigationEpoch.current; storage.set("name", name.trim() || "Player"); void run(async () => { const session = await joinArenaRoom({ inviteCode: invite.trim().toUpperCase(), name: name.trim() || "Player", collection }); if (navigationEpoch.current === expectedNavigation) openSession(session); }); }}><header className="modal-heading"><h2>Join your friend</h2><button type="button" className="icon-button" onClick={() => { navigationEpoch.current += 1; setModal(null); }} aria-label="Close join">×</button></header><label>Your name<input value={name} maxLength={24} readOnly={Boolean(signedInAccount)} onChange={(event) => setName(event.target.value)} autoComplete="nickname" /></label><label>Room code<input className="code-input" value={invite} onChange={(event) => setInvite(event.target.value.toUpperCase())} maxLength={12} placeholder="ABC123" autoCapitalize="characters" autoComplete="off" required /></label><button className="royale-button gold full-width" disabled={pending || !invite.trim()}>Enter battle room</button><button className="text-button" type="button" onClick={() => setModal("collection")}>Check my collection</button></form></div>}
     <footer className="unofficial-notice">This material is unofficial and is not endorsed by Supercell.</footer>
     <AccountControl hideTrigger onSession={applyAccountSession} onCollection={applyImportedCollection} />
   </main>;

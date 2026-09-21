@@ -4,10 +4,14 @@ import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import express from "express";
 import request from "supertest";
 import type { ArenaCard } from "@draft-royale/shared";
 import { createArenaApp } from "../arena/index.js";
 import { repoRoot } from "../config.js";
+import { CollectionImportError } from "../arena/collection-import.js";
+import type { SocialService } from "../social/service.js";
+import { createAccountRouter } from "./router.js";
 import type { AccountService } from "./service.js";
 
 const catalog = (JSON.parse(readFileSync(path.join(repoRoot, "data/catalog/arena-catalog.json"), "utf8")) as { cards: ArenaCard[] }).cards;
@@ -280,6 +284,105 @@ describe("remembered player accounts", () => {
     }).expect(401);
   });
 
+  it("reopens an accepted battle invitation after either player signs in again, on any device", async () => {
+    const app = createArenaApp({ catalog, catalogVersion: "test", databasePath: ":memory:", initialDealMs: 0 });
+    cleanup.push(() => app.locals.arenaService.close());
+    const accounts = app.locals.accountService as AccountService;
+    const host = accounts.register({ displayName: "HostFriend", password: "a secure local password" });
+    const guest = accounts.register({ displayName: "GuestFriend", password: "another secure password" });
+    const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
+    const link = await request(app).post("/api/social/friend-links").set(bearer(host.credential.token)).send({ commandId: "link" }).expect(201);
+    await request(app).post("/api/social/friend-links/accept").set(bearer(guest.credential.token)).send({ token: link.body.friendLink.token, commandId: "accept-link" }).expect(200);
+    const invite = await request(app).post("/api/social/invites").set(bearer(host.credential.token)).send({
+      friendId: guest.credential.profileId, commandId: "invite", collection: null,
+      settings: { mode: "mega", poolSize: 36, pickSeconds: 15, timerMode: "per_pick", specialForms: true, battleMode: "Friendly 1v1" },
+    }).expect(201);
+    const inviteId = invite.body.invite.id as string;
+    const accepted = await request(app).post(`/api/social/invites/${inviteId}/accept`).set(bearer(guest.credential.token)).send({ collection: null, commandId: "accept" }).expect(200);
+    const firstHost = await request(app).get(`/api/social/invites/${inviteId}/session`).set(bearer(host.credential.token)).expect(200);
+
+    const hostAgain = accounts.login({ username: "HostFriend", password: "a secure local password" });
+    const guestAgain = accounts.login({ username: "GuestFriend", password: "another secure password" });
+    const secondHost = await request(app).get(`/api/social/invites/${inviteId}/session`).set(bearer(hostAgain.credential.token)).expect(200);
+    const secondGuest = await request(app).get(`/api/social/invites/${inviteId}/session`).set(bearer(guestAgain.credential.token)).expect(200);
+    // Both devices of one account hold the same room seat instead of evicting each other.
+    expect(secondHost.body.session.credential).toEqual(firstHost.body.session.credential);
+    expect(secondGuest.body.session.credential).toEqual(accepted.body.session.credential);
+    await request(app).get(`/api/social/invites/${inviteId}/session`).set(bearer(host.credential.token)).expect(200);
+  });
+  it("befriends the first account on each club tag and nobody who merely tracks the same tag later", () => {
+    const app = createArenaApp({ catalog, catalogVersion: "test", databasePath: ":memory:", clubTags: ["#P0LYQ", "#2CGYR", "8QQ2"] });
+    cleanup.push(() => app.locals.arenaService.close());
+    const accounts = app.locals.accountService as AccountService;
+    accounts.register({ displayName: "FirstFriend", tag: "#P0LYQ", password: "a secure local password" });
+    const second = accounts.register({ displayName: "SecondFriend", password: "another secure password" });
+    const copycat = accounts.register({ displayName: "Copycat", password: "a third secure password" });
+    const outsider = accounts.register({ displayName: "Outsider", tag: "#9999", password: "a fourth secure password" });
+    const friendsOf = (username: string, password: string) => accounts.login({ username, password }).state.friends.map((friend) => friend.displayName).sort();
+    expect(friendsOf("FirstFriend", "a secure local password")).toEqual([]);
+    accounts.updateTag(second.account.profileId, "#2CGYR");
+    accounts.updateTag(copycat.account.profileId, "#P0LYQ");
+    expect(friendsOf("FirstFriend", "a secure local password")).toEqual(["SecondFriend"]);
+    expect(friendsOf("SecondFriend", "another secure password")).toEqual(["FirstFriend"]);
+    expect(friendsOf("Copycat", "a third secure password")).toEqual([]);
+    expect(outsider.state.friends).toEqual([]);
+    expect(friendsOf("Outsider", "a fourth secure password")).toEqual([]);
+  });
+  it("keeps a reset stand-in account tracked until its player signs up, then replaces it and fixes names from saved imports", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "draft-club-"));
+    cleanup.push(() => rmSync(dir, { recursive: true, force: true }));
+    const databasePath = path.join(dir, "test.sqlite");
+    const seeded = createArenaApp({ catalog, catalogVersion: "test", databasePath });
+    const seedAccounts = seeded.locals.accountService as AccountService;
+    const owner = seedAccounts.register({ displayName: "OwnerFriend", tag: "#P0LYQ", password: "a secure local password" });
+    const standIn = seedAccounts.register({ displayName: "StandIn", tag: "#2CGYR", password: "another secure password" });
+    const real = seedAccounts.register({ displayName: "Typed Rude Name", password: "a third secure password" });
+    seedAccounts.saveCollection(real.account.profileId, { cards: [catalog[0]!.key], forms: {}, source: "api", profile: { tag: "#2CGYR", name: "RealInGame", fetchedAt: new Date().toISOString() } });
+    (seeded.locals.socialService as SocialService).ensureFriendship(owner.account.profileId, standIn.account.profileId);
+    seeded.locals.arenaService.close();
+    const edit = new DatabaseSync(databasePath);
+    edit.prepare("UPDATE club_accounts SET password_version=-1, password_enabled=0 WHERE profile_id=?").run(standIn.account.profileId);
+    edit.prepare("DELETE FROM account_sessions WHERE profile_id=?").run(standIn.account.profileId);
+    edit.close();
+
+    const waiting = createArenaApp({ catalog, catalogVersion: "test", databasePath, clubTags: ["#P0LYQ", "#2CGYR"] });
+    const waitingAccounts = waiting.locals.accountService as AccountService;
+    expect(waitingAccounts.list().map((account) => account.username)).toContain("standin");
+    expect(waitingAccounts.login({ username: "OwnerFriend", password: "a secure local password" }).state.friends.map((friend) => friend.displayName)).toEqual(["StandIn"]);
+    waitingAccounts.updateTag(real.account.profileId, "#2CGYR");
+    expect(waitingAccounts.list().map((account) => account.username)).not.toContain("standin");
+    waiting.locals.arenaService.close();
+
+    const restarted = createArenaApp({ catalog, catalogVersion: "test", databasePath, clubTags: ["#P0LYQ", "#2CGYR"] });
+    cleanup.push(() => restarted.locals.arenaService.close());
+    const friends = (restarted.locals.accountService as AccountService).login({ username: "OwnerFriend", password: "a secure local password" }).state.friends;
+    expect(friends.map((friend) => friend.displayName)).toEqual(["RealInGame"]);
+  });
+  it("names an account after the Clash Royale profile it tracks and ignores names typed in the browser", async () => {
+    const arena = createArenaApp({ catalog, catalogVersion: "test", databasePath: ":memory:" });
+    cleanup.push(() => arena.locals.arenaService.close());
+    const accounts = arena.locals.accountService as AccountService;
+    const importPlayer = async (tag: unknown) => {
+      if (tag === "#9999") throw new CollectionImportError(503, "Clash Royale is unavailable.", "API_UNAVAILABLE");
+      return {
+        collection: { cards: [catalog[0]!.key], forms: {}, source: "api" as const, profile: { tag: String(tag), name: "InGameName", fetchedAt: new Date().toISOString() } },
+        fetchedAt: new Date().toISOString(), expiresAt: new Date().toISOString(), cached: false, stale: false, warnings: [],
+      };
+    };
+    const app = express();
+    app.use(express.json());
+    app.use(createAccountRouter(accounts, arena.locals.socialService as SocialService, { importPlayer }));
+    const session = accounts.register({ displayName: "TypedName", password: "a secure local password" });
+    const bearer = { Authorization: `Bearer ${session.credential.token}` };
+    const saved = await request(app).patch("/api/accounts/profile").set(bearer).send({ tag: "#P0LYQ" }).expect(200);
+    expect(saved.body.account).toMatchObject({ tag: "#P0LYQ", displayName: "InGameName", username: "typedname" });
+    expect(saved.body.collection.cards).toEqual([catalog[0]!.key]);
+    const renamed = await request(arena).patch("/api/social/profile").set(bearer).send({ displayName: "Something rude", commandId: "rename" }).expect(200);
+    expect(renamed.body.state.profile.displayName).toBe("InGameName");
+    expect(accounts.login({ username: "TypedName", password: "a secure local password" }).account.displayName).toBe("InGameName");
+    const offline = await request(app).patch("/api/accounts/profile").set(bearer).send({ tag: "#9999" }).expect(200);
+    expect(offline.body).toMatchObject({ account: { tag: "#9999", displayName: "InGameName" }, importError: "Clash Royale is unavailable." });
+  });
   it("keeps Google disabled without operator configuration and validates nonce, issuer, audience, expiry, and safe linking when configured", async () => {
     const disabled = createArenaApp({ catalog, catalogVersion: "test", databasePath: ":memory:" });
     cleanup.push(() => disabled.locals.arenaService.close());

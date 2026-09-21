@@ -8,11 +8,13 @@ import {
   createGoogleChallenge,
   finishGoogleSignIn,
   forgetAccount,
+  forgetAccountDevice,
   getAccountSession,
   getProviderConfig,
   importAccountCollection,
   loginAccount,
   logoutAccount,
+  onAccountChange,
   recoverAccount,
   registerAccount,
   rotateAccountRecovery,
@@ -91,7 +93,8 @@ function GoogleSignIn({ clientId, linkToken, onSession, onError }: {
 }
 
 export function AccountButton() {
-  const account = rememberedAccount();
+  const [account, setAccount] = useState(rememberedAccount);
+  useEffect(() => onAccountChange(() => setAccount(rememberedAccount())), []);
   return <button className="small-button account-button" onClick={() => window.dispatchEvent(new Event("draft-royale:sign-in"))}>{account ? <UserRound size={16} /> : <LogIn size={16} />}<span>{account?.displayName ?? "Sign in"}</span></button>;
 }
 
@@ -143,6 +146,11 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
       if (failure instanceof AccountApiError && failure.status === 401) { forgetAccount(); setAccount(null); }
     });
   }, [onSession]);
+  // Another tab signing in or out must not leave this one showing a stale account.
+  useEffect(() => onAccountChange(() => {
+    const next = rememberedAccount();
+    setAccount((current) => current?.profileId === next?.profileId && current?.tag === next?.tag && current?.displayName === next?.displayName ? current : next);
+  }), []);
   useEffect(() => {
     void getProviderConfig().then(setProviders).catch(() => setProviders({ google: { enabled: false }, apple: { enabled: false } }));
   }, []);
@@ -180,14 +188,22 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
     finally { setPending(false); }
   }
 
+  // The account's name follows the Clash Royale profile it tracks, so every place that shows it must follow too.
+  const applyAccount = (next: ClubAccount) => {
+    setAccount(next); setTag(next.tag ?? ""); rememberAccount(next); storage.set("name", next.displayName);
+  };
+
   async function saveTag(value: string | null) {
     const identity = readSocialIdentity();
     if (!identity?.token) return;
     setPending(true); setError(""); setNotice("");
     try {
       const result = await updateAccountTag(identity.token, value);
-      setAccount(result.account); setTag(result.account.tag ?? ""); rememberAccount(result.account);
-      setNotice(result.account.tag ? "Player tag saved. Import your cards next." : "Tracked player tag removed. Your saved collection is unchanged.");
+      applyAccount(result.account);
+      if (result.collection) onCollection?.(result.collection, result.account);
+      setNotice(!result.account.tag ? "Tracked player tag removed. Your saved collection is unchanged."
+        : result.collection ? `Player tag saved. You now appear as ${result.account.displayName}, and ${result.collection.cards?.length ?? 0} cards were imported.`
+          : `Player tag saved. ${result.importError ?? "Clash Royale could not be reached."} Use Import profile collection to try again.`);
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not save the player tag."); }
     finally { setPending(false); }
   }
@@ -198,7 +214,8 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
     setPending(true); setError(""); setNotice("");
     try {
       const imported = await importAccountCollection(identity.token);
-      onCollection?.(imported.collection, account);
+      if (imported.account) applyAccount(imported.account);
+      onCollection?.(imported.collection, imported.account ?? account);
       setNotice(imported.stale ? "Clash Royale is unavailable, so your last successful import was kept." : `${imported.collection.cards?.length ?? 0} cards imported and saved to this account.`);
     } catch (failure) { setError(failure instanceof Error ? `${failure.message} Your saved collection was not changed.` : "Collection import failed. Your saved collection was not changed."); }
     finally { setPending(false); }
@@ -210,10 +227,10 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
     setPending(true); setError("");
     try {
       await logoutAccount(identity.token);
-      clearSocialIdentity(); forgetAccount(); storage.set("name", "Player"); window.location.reload();
+      clearSocialIdentity(); forgetAccount(); forgetAccountDevice(); storage.set("name", "Player"); window.location.reload();
     } catch (failure) {
       if (failure instanceof AccountApiError && failure.status === 401) {
-        clearSocialIdentity(); forgetAccount(); storage.set("name", "Player"); window.location.reload(); return;
+        clearSocialIdentity(); forgetAccount(); forgetAccountDevice(); storage.set("name", "Player"); window.location.reload(); return;
       }
       setError(failure instanceof Error ? `${failure.message} This device stayed signed in because the server could not confirm revocation.` : "Could not confirm sign out. This device stayed signed in.");
       setPending(false);
@@ -242,7 +259,8 @@ export function AccountControl({ hideTrigger = false, onSession, onCollection }:
       {newRecoveryCode ? <div className="club-recovery-card"><KeyRound /><div><strong>This is shown once</strong><p>Save this code somewhere private. It can reset your password if you lose access; using it replaces the code and signs out other devices.</p><code>{newRecoveryCode}</code></div><button className="royale-button gold full-width" onClick={() => window.location.reload()}><Check size={18} /> I saved it — continue</button></div>
         : account ? <div className="club-account-current">
           <div className="club-session-ok"><ShieldCheck size={18} /><span>Signed in on this device</span></div>
-          <p>Your private decks, friends, collection, and match records belong to this Draft Royale profile—not to a public player tag.</p>
+          <p>Your private decks, friends, collection, and match records belong to this Draft Royale profile—not to a public player tag. Your name here is the in-game name of the tag you track.</p>
+          {account.passwordEnabled && account.username !== account.displayName.toLowerCase() ? <p className="club-account-hint">Password sign-in name: <strong>{account.username}</strong></p> : null}
           <div className="club-tag-editor"><label>Tracked Clash Royale tag<input value={tag} onChange={(event) => setTag(event.target.value.toUpperCase())} placeholder="#YOURTAG" maxLength={16} /></label><div><button className="royale-button blue" disabled={pending || !tag.trim()} onClick={() => void saveTag(tag)}>Save tag</button>{account.tag ? <button className="text-button" disabled={pending} onClick={() => void saveTag(null)}>Remove</button> : null}</div></div>
           {account.tag ? <button className="royale-button gold full-width" disabled={pending} onClick={() => void importCollection()}><RefreshCw size={18} /> {pending ? "Importing…" : "Import profile collection"}</button> : <p className="club-account-hint">Add a public tag, then import the full profile inventory. More than one Draft Royale account may track the same tag.</p>}
           {providers?.google.enabled && providers.google.clientId && !account.providers.includes("google") ? <div className="club-provider-link"><span>Optional faster sign-in</span><GoogleSignIn clientId={providers.google.clientId} linkToken={readSocialIdentity()?.token} onSession={googleSession} onError={setError} /></div> : null}

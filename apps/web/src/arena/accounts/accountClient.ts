@@ -56,11 +56,33 @@ export const rememberedAccount = (): ClubAccount | null => {
   } catch { return null; }
 };
 
+const ACCOUNT_CHANGED_EVENT = "draft-royale:account-changed";
+const announceAccountChange = () => { try { window.dispatchEvent(new Event(ACCOUNT_CHANGED_EVENT)); } catch { /* Non-browser contexts. */ } };
+
 export const rememberAccount = (account: ClubAccount) => {
-  try { localStorage.setItem("draft-royale:account", JSON.stringify(account)); } catch { /* The server session remains authoritative. */ }
+  try {
+    localStorage.setItem("draft-royale:account", JSON.stringify(account));
+    localStorage.setItem("draft-royale:account-device", "1");
+  } catch { /* The server session remains authoritative. */ }
+  announceAccountChange();
 };
 export const forgetAccount = () => {
   try { localStorage.removeItem("draft-royale:account"); } catch { /* Best effort. */ }
+  announceAccountChange();
+};
+/** True once this browser has signed in to an account, until someone deliberately signs out of the device. */
+export const deviceHasAccount = () => {
+  try { return localStorage.getItem("draft-royale:account-device") === "1"; } catch { return false; }
+};
+export const forgetAccountDevice = () => {
+  try { localStorage.removeItem("draft-royale:account-device"); } catch { /* Best effort. */ }
+};
+/** Re-runs `listener` whenever the remembered account changes in this tab or another one. */
+export const onAccountChange = (listener: () => void) => {
+  const onStorage = (event: StorageEvent) => { if (event.key === null || event.key.startsWith("draft-royale:")) listener(); };
+  window.addEventListener(ACCOUNT_CHANGED_EVENT, listener);
+  window.addEventListener("storage", onStorage);
+  return () => { window.removeEventListener(ACCOUNT_CHANGED_EVENT, listener); window.removeEventListener("storage", onStorage); };
 };
 export const collectionStorageKey = (profileId: string) => `collection:${profileId}`;
 export const collectionDirtyKey = (profileId: string) => `collection-dirty:${profileId}`;
@@ -74,9 +96,9 @@ export const registerAccount = (displayName: string, password: string, resetCode
 export const recoverAccount = (username: string, recoveryCode: string, newPassword: string) => accountRequest<AccountSession>("/recover", { body: { username, recoveryCode, newPassword } });
 export const rotateAccountRecovery = (token: string, password: string) => accountRequest<{ recoveryCode: string }>("/recovery/rotate", { body: { password }, token });
 export const logoutAccount = (token: string) => accountRequest<{ ok: true }>("/logout", { body: {}, token });
-export const updateAccountTag = (token: string, tag: string | null) => accountRequest<{ account: ClubAccount }>("/profile", { method: "PATCH", body: { tag }, token });
+export const updateAccountTag = (token: string, tag: string | null) => accountRequest<{ account: ClubAccount; collection?: ArenaCollection; importError?: string }>("/profile", { method: "PATCH", body: { tag }, token });
 export const saveAccountCollection = (token: string, collection: ArenaCollection) => accountRequest<{ collection: ArenaCollection }>("/collection", { method: "PUT", body: { collection }, token });
-export const importAccountCollection = (token: string) => accountRequest<ArenaCollectionImportResponse>("/collection/import", { body: {}, token });
+export const importAccountCollection = (token: string) => accountRequest<ArenaCollectionImportResponse & { account?: ClubAccount }>("/collection/import", { body: {}, token });
 export const createGoogleChallenge = () => accountRequest<{ state: string; nonce: string; expiresAt: string }>("/google/challenge", { body: {} });
 export const finishGoogleSignIn = (credential: string, state: string, token?: string) => accountRequest<AccountSession>("/google", {
   body: { credential, state, ...(token ? { action: "link" } : {}) }, token,

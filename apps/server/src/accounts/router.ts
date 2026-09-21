@@ -13,6 +13,8 @@ const cookieValue = (header: string | undefined, name: string) => {
   }
   return "";
 };
+const asyncRoute = (handler: (request: express.Request, response: express.Response) => Promise<void>): express.RequestHandler =>
+  (request, response, next) => { handler(request, response).catch(next); };
 const secureRequest = (request: express.Request) => request.secure || request.header("x-forwarded-proto")?.split(",")[0]?.trim() === "https";
 
 export function createAccountRouter(accounts: AccountService, social: SocialService, collectionImport: CollectionImportService): express.Router {
@@ -98,11 +100,22 @@ export function createAccountRouter(accounts: AccountService, social: SocialServ
     const result = accounts.logout(bearer(request.header("authorization")));
     response.json({ ok: true, ...result });
   });
-  router.patch("/api/accounts/profile", mutationBudget, (request, response) => {
+  router.patch("/api/accounts/profile", mutationBudget, asyncRoute(async (request, response) => {
     const user = auth(request);
     const body = request.body && typeof request.body === "object" ? request.body as Record<string, unknown> : {};
-    response.json({ account: accounts.updateTag(user.profile.id, body.tag) });
-  });
+    let account = accounts.updateTag(user.profile.id, body.tag);
+    if (!account.tag) { response.json({ account }); return; }
+    // Saving a tag also brings in that player's name and cards, so there is no second step to forget.
+    try {
+      const imported = await collectionImport.importPlayer(account.tag);
+      const collection = accounts.saveCollection(user.profile.id, imported.collection);
+      account = accounts.setPlayerName(user.profile.id, imported.collection.profile?.name);
+      response.json({ account, collection });
+    } catch (error) {
+      if (!(error instanceof CollectionImportError)) throw error;
+      response.json({ account, importError: error.message });
+    }
+  }));
   router.put("/api/accounts/collection", mutationBudget, (request, response) => {
     const user = auth(request);
     const body = request.body && typeof request.body === "object" ? request.body as Record<string, unknown> : {};
@@ -114,7 +127,8 @@ export function createAccountRouter(accounts: AccountService, social: SocialServ
       if (!user.account.tag) throw new AccountError(409, "Add a Clash Royale tag before importing a collection.", "PLAYER_TAG_REQUIRED");
       const imported = await collectionImport.importPlayer(user.account.tag);
       const collection = accounts.saveCollection(user.profile.id, imported.collection);
-      response.json({ ...imported, collection });
+      const account = accounts.setPlayerName(user.profile.id, imported.collection.profile?.name);
+      response.json({ ...imported, collection, account });
     } catch (error) { next(error); }
   });
 

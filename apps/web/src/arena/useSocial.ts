@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ArenaCollection, ArenaSessionResponse, ArenaSettings, SocialCredential, SocialFriendLink, SocialState } from "@draft-royale/shared";
+import { deviceHasAccount } from "./accounts/accountClient";
 import {
   SOCIAL_IDENTITY_STORAGE_KEY,
   SocialApiError,
@@ -57,6 +58,7 @@ export function useSocial(displayName: string): SocialController {
   const displayNameRef = useRef(displayName);
   const activationRef = useRef<Promise<SocialCredential | null> | null>(null);
   const pendingRef = useRef(new Set<string>());
+  const refreshRef = useRef<(quiet?: boolean) => Promise<void>>(async () => undefined);
   const recoveryRef = useRef(initialInspection.current.status === "malformed" || initialInspection.current.status === "unavailable");
   const [identity, setIdentity] = useState<SocialCredential | null>(() => credentialOf(initialIdentity.current));
   const [state, setState] = useState<SocialState | null>(null);
@@ -97,7 +99,9 @@ export function useSocial(displayName: string): SocialController {
     if (failure instanceof SocialApiError && failure.status === 401) {
       recoveryRef.current = true;
       setStatus("recovery");
-      setError("This browser's saved friend profile could not be restored. Retry it or start a new profile.");
+      setError(deviceHasAccount()
+        ? "Your sign-in on this device has ended. Sign in again to see your friends."
+        : "This browser's saved friend profile could not be restored. Retry it or start a new profile.");
       return;
     }
     setStatus((current) => current === "ready" && navigator.onLine ? current : "offline");
@@ -153,7 +157,13 @@ export function useSocial(displayName: string): SocialController {
       setStatus("ready");
       return result;
     } catch (failure) {
-      if (!requestToken || identityRef.current?.token === requestToken) handleFailure(failure, options.quiet);
+      if (requestToken && identityRef.current?.token !== requestToken) return undefined;
+      // Only the identity check may declare the saved sign-in broken. One action answering 401
+      // (a stale room, a proxy hiccup) must never hide the friends list or offer to replace the profile.
+      if (requestToken && failure instanceof SocialApiError && failure.status === 401) {
+        if (!options.quiet) setError(messageOf(failure));
+        await refreshRef.current(true);
+      } else handleFailure(failure, options.quiet);
       return undefined;
     } finally {
       setPending(key, false);
@@ -174,6 +184,7 @@ export function useSocial(displayName: string): SocialController {
       setPending("refresh", false);
     }
   }, [applyState, handleFailure, setPending]);
+  refreshRef.current = refresh;
 
   useEffect(() => {
     const current = identityRef.current;
@@ -226,6 +237,8 @@ export function useSocial(displayName: string): SocialController {
 
   const startNewProfile = useCallback(async () => {
     if (pendingRef.current.size > 0) return;
+    // Replacing the stored identity would sign an account out, so an account device signs in again instead.
+    if (deviceHasAccount()) { window.dispatchEvent(new Event("draft-royale:sign-in")); return; }
     setPending("new-profile", true);
     try {
       clearSocialIdentity();

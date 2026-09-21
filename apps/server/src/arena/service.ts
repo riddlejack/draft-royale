@@ -168,6 +168,7 @@ export interface ArenaService {
   normalizeSettings(input: unknown): ArenaSettings;
   normalizeCollection(input: unknown): ArenaCollection;
   createInvitedRoom(input: CreateInvitedRoomInput): CreateInvitedRoomResult;
+  rebindInvitedSeat(roomId: string, seat: ArenaSeat, tokenHash: string): void;
   createRoom(input: CreateRoomInput): ArenaSessionResponse;
   joinRoom(input: JoinRoomInput): ArenaSessionResponse;
   getRoomCatalog(roomId: string, token: string): ArenaCatalogResponse;
@@ -1556,6 +1557,15 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
     return result;
   };
 
+  // The social layer has already proven who owns an invited seat, so it may move that seat
+  // onto the owner's current room token after their sign-in credential changes.
+  const rebindInvitedSeat = (roomId: string, seat: ArenaSeat, tokenHash: string) => {
+    ensureOpen();
+    if (!/^[a-f0-9]{64}$/.test(tokenHash)) throw new ArenaError(400, "Invited room token hashes must be SHA-256 hex strings", "INVALID_TOKEN_HASH");
+    const changed = db.prepare("UPDATE arena_credentials SET token_hash = ? WHERE room_id = ? AND seat = ?").run(tokenHash, roomId, seat);
+    if (changed.changes !== 1) throw new ArenaError(404, "Room not found", "ROOM_NOT_FOUND");
+  };
+
   const getView = (roomId: string, token: string) => {
     ensureOpen();
     const seat = credentialSeat(roomId, token);
@@ -2341,6 +2351,7 @@ export const createArenaService = (options: ArenaServiceOptions): ArenaService =
     normalizeSettings,
     normalizeCollection,
     createInvitedRoom,
+    rebindInvitedSeat,
     createRoom,
     joinRoom,
     getRoomCatalog,

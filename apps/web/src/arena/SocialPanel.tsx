@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, Link, Swords, UserMinus, UserPlus, Users, WifiOff, X } from "lucide-react";
 import { isChaosBattleMode, type ArenaCollection, type ArenaSettings, type SocialFriend, type SocialInvite } from "@draft-royale/shared";
 import type { SocialController } from "./useSocial";
+import { deviceHasAccount } from "./accounts/accountClient";
 import "./social.css";
 
 interface SocialPanelProps {
   social: SocialController;
   name: string;
+  nameLocked?: boolean;
   onNameChange: (name: string) => void;
   settings: ArenaSettings;
   collection: ArenaCollection;
@@ -57,7 +59,7 @@ const timeRemaining = (invite: SocialInvite, serverNow: number) => {
   return minutes <= 1 ? "Expires in under a minute" : `Expires in ${minutes} min`;
 };
 
-export function SocialPanel({ social, name, onNameChange, settings, collection, friendToken, onFriendTokenChange, onAcceptInvite, onOpenInvite, onLegacyInvite, onClose, onCopy }: SocialPanelProps) {
+export function SocialPanel({ social, name, nameLocked = false, onNameChange, settings, collection, friendToken, onFriendTokenChange, onAcceptInvite, onOpenInvite, onLegacyInvite, onClose, onCopy }: SocialPanelProps) {
   const [pastedLink, setPastedLink] = useState("");
   const [reviewedToken, setReviewedToken] = useState(friendToken);
   const [removeCandidate, setRemoveCandidate] = useState<SocialFriend | null>(null);
@@ -98,12 +100,14 @@ export function SocialPanel({ social, name, onNameChange, settings, collection, 
     <section className="arena-modal social-modal" role="dialog" aria-modal="true" aria-labelledby="social-title" onClick={(event) => event.stopPropagation()}>
       <header className="modal-heading"><div><h2 id="social-title">Friends</h2>{pendingCount > 0 && <span className="social-heading-badge">{pendingCount} new</span>}</div><button className="icon-button" onClick={onClose} aria-label="Close friends"><X /></button></header>
 
-      <p className="social-privacy"><Users size={17} /> Your friends stay here between visits. Use this same browser to find them.</p>
-      <label className="social-display-name">Your name<input value={name} maxLength={24} autoComplete="nickname" onChange={(event) => onNameChange(event.target.value)} /></label>
+      <p className="social-privacy"><Users size={17} /> {nameLocked ? "Your friends belong to your account and follow you to any device you sign in on." : "Your friends stay here between visits. Use this same browser to find them, or sign in to keep them on every device."}</p>
+      <label className="social-display-name">Your name<input value={name} maxLength={24} autoComplete="nickname" readOnly={nameLocked} title={nameLocked ? "Your name comes from the Clash Royale tag on your account." : undefined} onChange={(event) => onNameChange(event.target.value)} /></label>
 
       {social.status === "recovery" && <section className="social-recovery" role="alert">
         <WifiOff size={25} /><div><strong>Friend profile needs attention</strong><p>{social.error}</p></div>
-        <div className="social-inline-actions"><button className="small-button" onClick={() => void social.retry()} disabled={social.isPending()}>Retry saved profile</button><button className="text-button danger-text" onClick={() => void social.startNewProfile()} disabled={social.isPending()}>Start a new profile</button></div>
+        <div className="social-inline-actions"><button className="small-button" onClick={() => void social.retry()} disabled={social.isPending()}>{deviceHasAccount() ? "Try again" : "Retry saved profile"}</button>{deviceHasAccount()
+          ? <button className="royale-button gold" onClick={() => { onClose(); window.dispatchEvent(new Event("draft-royale:sign-in")); }}>Sign in again</button>
+          : <button className="text-button danger-text" onClick={() => void social.startNewProfile()} disabled={social.isPending()}>Start a new profile</button>}</div>
       </section>}
 
       {reviewedToken && social.status !== "recovery" && <section className="social-request" data-testid="friend-link-review">

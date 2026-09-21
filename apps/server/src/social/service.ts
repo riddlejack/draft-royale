@@ -29,6 +29,7 @@ const maxPendingInvites = 20;
 type ArenaSocialBridge = ArenaService & {
   normalizeSettings(input: unknown): ArenaSettings;
   normalizeCollection(input: unknown): ArenaCollection;
+  rebindInvitedSeat(roomId: string, seat: "a" | "b", tokenHash: string): void;
   createInvitedRoom(input: {
     operationId: string;
     settings: ArenaSettings;
@@ -111,6 +112,11 @@ export interface SocialService {
   retirePrimaryCredential(profileId: string, token: string, replacementHash: string, kind?: string, expiresAt?: number | null): boolean;
   revokeCredential(profileId: string, token: string): void;
   revokeCredentials(profileId: string, kind: string): void;
+  /** Profiles the guard names keep the display name their account assigns; browser rename requests are ignored. */
+  setDisplayNameGuard(guard: (profileId: string) => boolean): void;
+  setDisplayName(profileId: string, displayName: string): void;
+  ensureFriendship(leftProfileId: string, rightProfileId: string): boolean;
+  deleteProfile(profileId: string): void;
   close(): void;
 }
 
@@ -154,8 +160,10 @@ const parseJson = <T>(value: string, label: string): T => {
   }
 };
 
-export const deriveSocialRoomToken = (profileToken: string, inviteId: string, seat: "a" | "b") =>
-  `ars_${createHmac("sha256", profileToken).update(`social-invite:${inviteId}:${seat}`).digest("base64url")}`;
+// Room seats are keyed to the profile, never to one sign-in session: a session token changes on every
+// sign-in and differs per device, and a seat derived from it would lock its owner out of their own room.
+export const deriveSocialRoomToken = (profileRoomKey: string, inviteId: string, seat: "a" | "b") =>
+  `ars_${createHmac("sha256", profileRoomKey).update(`social-invite:${inviteId}:${seat}`).digest("base64url")}`;
 
 export const createSocialService = (options: SocialServiceOptions): SocialService => {
   const now = options.now ?? Date.now;
@@ -184,6 +192,12 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     );
     CREATE INDEX IF NOT EXISTS social_profile_credentials_profile
       ON social_profile_credentials(profile_id, revoked_at, expires_at);
+    CREATE TABLE IF NOT EXISTS social_profile_room_keys (
+      profile_id TEXT PRIMARY KEY,
+      room_key TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (profile_id) REFERENCES social_profiles(id) ON DELETE CASCADE
+    );
     CREATE TABLE IF NOT EXISTS social_friend_links (
       id TEXT PRIMARY KEY,
       owner_profile_id TEXT NOT NULL,
@@ -278,6 +292,12 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     const row = db.prepare("SELECT id, display_name, token_hash, created_at FROM social_profiles WHERE id = ?").get(profileId) as unknown as ProfileRow | undefined;
     if (!row) throw new SocialError(404, "Profile not found", "PROFILE_NOT_FOUND");
     return row;
+  };
+
+  const roomTokenFor = (profileId: string, inviteId: string, seat: "a" | "b") => {
+    db.prepare("INSERT OR IGNORE INTO social_profile_room_keys(profile_id, room_key, created_at) VALUES(?,?,?)").run(profileId, makeToken(), now());
+    const row = db.prepare("SELECT room_key FROM social_profile_room_keys WHERE profile_id = ?").get(profileId) as { room_key: string };
+    return deriveSocialRoomToken(row.room_key, inviteId, seat);
   };
 
   const inviteRow = (inviteId: string) => {
@@ -409,9 +429,33 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
       .run(now(), profileId, kind);
   };
 
+  let displayNameGuard: (profileId: string) => boolean = () => false;
+  const setDisplayName = (profileId: string, displayName: string) => {
+    ensureOpen();
+    const name = requireDisplayName(displayName);
+    transaction(() => {
+      db.prepare("UPDATE social_profiles SET display_name = ?, updated_at = ? WHERE id = ?").run(name, now(), profileId);
+      db.prepare("UPDATE social_invites SET sender_name = ? WHERE sender_id = ?").run(name, profileId);
+      db.prepare("UPDATE social_invites SET recipient_name = ? WHERE recipient_id = ?").run(name, profileId);
+    });
+  };
+  const deleteProfile = (profileId: string) => {
+    ensureOpen();
+    db.prepare("DELETE FROM social_profiles WHERE id = ?").run(profileId);
+  };
+  const ensureFriendship = (leftProfileId: string, rightProfileId: string) => {
+    ensureOpen();
+    if (leftProfileId === rightProfileId) return false;
+    profileRow(leftProfileId);
+    profileRow(rightProfileId);
+    const [low, high] = canonicalFriendIds(leftProfileId, rightProfileId);
+    return db.prepare("INSERT OR IGNORE INTO social_friendships(profile_low, profile_high, created_at) VALUES(?,?,?)").run(low, high, now()).changes === 1;
+  };
+
   const updateProfile = (auth: AuthenticatedSocialProfile, input: { displayName: unknown; commandId: unknown }) => {
     const displayName = requireDisplayName(input.displayName);
     const commandId = requireCommandId(input.commandId);
+    if (displayNameGuard(auth.profile.id)) return getState(auth);
     const action = "profile.update";
     const hash = payloadHash({ displayName });
     transaction(() => {
@@ -517,7 +561,7 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     const id = makeId("si");
     const timestamp = now();
     const expiresAt = timestamp + SOCIAL_INVITE_TTL_MS;
-    const senderRoomTokenHash = sha256(deriveSocialRoomToken(auth.token, id, "a"));
+    const senderRoomTokenHash = sha256(roomTokenFor(auth.profile.id, id, "a"));
     const resolvedId = transaction(() => {
       const replay = commandReplay(auth.profile.id, commandId, action, hash);
       if (replay) return replay;
@@ -549,8 +593,24 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     if (row.status !== "accepted" || !row.arena_room_id) throw new SocialError(409, "This invitation does not have an active room", "INVALID_INVITE_STATE");
     const seat = row.sender_id === auth.profile.id ? "a" : row.recipient_id === auth.profile.id ? "b" : null;
     if (!seat) throw new SocialError(403, "This invitation belongs to another profile", "INVITE_FORBIDDEN");
-    const token = deriveSocialRoomToken(auth.token, row.id, seat);
-    return { credential: { roomId: row.arena_room_id, seat, token }, room: options.arena.getView(row.arena_room_id, token) };
+    const token = roomTokenFor(auth.profile.id, row.id, seat);
+    const roomId = row.arena_room_id;
+    const statusOf = (error: unknown) => (error as { status?: unknown } | null)?.status;
+    try {
+      let room: ArenaView;
+      try { room = options.arena.getView(roomId, token); }
+      catch (error) {
+        if (statusOf(error) !== 401) throw error;
+        // Rooms opened before seats were profile-keyed still hold a hash of an old sign-in token.
+        options.arena.rebindInvitedSeat(roomId, seat, sha256(token));
+        room = options.arena.getView(roomId, token);
+      }
+      return { credential: { roomId, seat, token }, room };
+    } catch (error) {
+      // A room problem is never a sign-in problem; a 401 here would make the browser distrust a valid login.
+      if ([401, 404, 410].includes(Number(statusOf(error)))) throw new SocialError(410, "This battle room is no longer available", "INVITE_ROOM_UNAVAILABLE");
+      throw error;
+    }
   };
 
   const acceptInvite = (auth: AuthenticatedSocialProfile, rawInviteId: unknown, input: { collection?: unknown; commandId: unknown }): SocialInviteSessionResponse => {
@@ -576,7 +636,7 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     if (row.status !== "pending") throw new SocialError(409, "This invitation can no longer be accepted", "INVALID_INVITE_STATE");
     const settings = parseJson<ArenaSettings>(row.settings_json, "invitation settings");
     const senderCollection = parseJson<ArenaCollection>(row.sender_collection_json, "sender collection");
-    const guestToken = deriveSocialRoomToken(auth.token, row.id, "b");
+    const guestToken = roomTokenFor(auth.profile.id, row.id, "b");
     const room = options.arena.createInvitedRoom({
       operationId: row.id,
       pairKey: sha256(JSON.stringify(canonicalFriendIds(row.sender_id, row.recipient_id))),
@@ -642,6 +702,10 @@ export const createSocialService = (options: SocialServiceOptions): SocialServic
     retirePrimaryCredential,
     revokeCredential,
     revokeCredentials,
+    setDisplayNameGuard: (guard) => { displayNameGuard = guard; },
+    setDisplayName,
+    ensureFriendship,
+    deleteProfile,
     getState,
     updateProfile,
     createFriendLink,
