@@ -8,14 +8,13 @@ Provides much-needed improvements to friendly battles. In-game drafts pull from 
 
 ## What you can do
 
-- **Mega Draft.**
-- **Classic and Triple Draft.**
-- **Evos, Heroes, and Champions.** Pick a card's form as you draft it, and the deck fills the game's special slots correctly. Group the special forms into their own rounds, or switch them off for a plain draft.
+- **Mega, Classic and Triple Draft.**
+- **Evos, Heroes, and Champions.** Pick a card's form as you draft it, and the deck fills the game's special slots correctly.
 - **Your rules.** Filter the pool by elixir cost, rarity, card type, or family, or include and exclude cards by hand. Set a timer per pick or for the whole draft. Add the Mirror card, or draft for a Chaos mode with its own pool.
-- **Your cards.** Enter a player tag to import that profile's collection, and drafts only offer cards and forms both players actually own.
+- **Your cards.** Enter your player tag & the drafts will only include cards both players have unlocked.
 - **Friends.** Add a friend with a one-time link, challenge them, and rematch from the same room. Or skip accounts and send anyone a room code.
 - **Decks.** Save and edit decks, share them with friends, and see each card's record while you build. Same-deck battles hand both players the identical deck in the same order.
-- **Match records.** The game only remembers your last 25 battles. The server keeps polling the public battle log for every tracked tag, so history builds up: head-to-head rivalries, the cards and decks you lose to, tilt after a loss, time of day, trophy timeline. Every figure shows its sample size.
+- **Match records.** Game analytics. The server keeps polling the public battle log for every tracked tag, so history builds up: head-to-head rivalries, the cards and decks you lose to, tilt after a loss, time of day, trophy timeline. Every figure shows its sample size.
 
 Draft Royale never touches the game. It builds a deck and hands Clash Royale a deck link; you pick the battle mode in the game yourself.
 
